@@ -27,7 +27,7 @@ def index():
     """
     from bokeh.sampledata.stocks import AAPL, GOOG, IBM, MSFT
 
-    plot_dashboard_obj = gen_dashboard(ticker_tups=(#('AAPL', AAPL),
+    plot_dashboard_obj = gen_dashboard(ticker_tuples=(#('AAPL', AAPL),
                                                    #('GOOG',GOOG),
                                                    ('IBM',IBM),
                                                    ('MSFT',MSFT),
