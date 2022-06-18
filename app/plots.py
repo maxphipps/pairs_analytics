@@ -93,21 +93,18 @@ def gen_dashboard(ticker_tups):
             // update the residue values
             y_residue[i] = y1_times_f[i] - y0[i];
             
-            // update the residue values moving average
-            if (i >= ndays_ma) {
-                i_ma = i-ndays_ma;
-                y_residue_ma[i_ma] = y_residue[i];
+            // update the residue values' moving average
+            if (i >= ndays_ma-1) {
+                y_residue_ma[i] = 0;
                 // cumsum the previous n days
-                //for (var j = i_ma; j > Math.max(0,i_ma-ndays_ma); j--) {
-                for (var j = i; j > Math.max(0,i-ndays_ma); j--) {
-                    y_residue_ma[i_ma] += y_residue[j];
+                for (var j = Math.max(0,i-ndays_ma); j <= i; j++) {
+                    y_residue_ma[i] += y_residue[j];
                 }
-                y_residue_ma[i_ma] /= ndays_ma;
+                y_residue_ma[i] /= ndays_ma;
             }
-            
         }
 
-        // necessary because we mutated source_pairFac.data in-place
+        // necessary because we mutated source_pairFac.data inplace
         source_pairFac.change.emit();
     """)
     slider_pairFac.js_on_change('value', update_price_curve)
