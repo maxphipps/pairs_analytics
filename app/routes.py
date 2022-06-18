@@ -2,7 +2,7 @@ from flask import render_template
 from app import app
 from bokeh.embed import components
 
-from .plots import gen_dashboard
+from .plots import Dashboard
 
 
 @app.after_request
@@ -27,16 +27,16 @@ def index():
     """
     from bokeh.sampledata.stocks import AAPL, GOOG, IBM, MSFT
 
-    plot_dashboard_obj = gen_dashboard(ticker_tuples=(#('AAPL', AAPL),
+    plot_dashboard_obj = Dashboard(ticker_tuples=(#('AAPL', AAPL),
                                                    #('GOOG',GOOG),
                                                    ('IBM',IBM),
                                                    ('MSFT',MSFT),
-                                                   ))
+                                                   )).get_plot()
 
     _script, _div = components(plot_dashboard_obj)
     plot_dashboard = {'script': _script, 'div': _div}
 
     return render_template('index.html', title='plot',
-                           # plot_prices=plot_prices,
+                           # prices_plot=prices_plot,
                            # plot_ma=plot_ma,
                            plot_dashboard=plot_dashboard)

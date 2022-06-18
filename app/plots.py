@@ -1,7 +1,8 @@
 from bokeh.plotting import figure
 from bokeh.layouts import column, gridplot
-from bokeh.models import CustomJS, ColumnDataSource, Slider, Band
+from bokeh.models import CustomJS, ColumnDataSource, Slider, Band, Span
 from bokeh.models.layouts import Column
+from bokeh.models.ranges import DataRange1d
 from bokeh.palettes import Spectral6
 import numpy as np
 
@@ -12,10 +13,10 @@ Main plot routines
 """
 
 UPDATE_PRICE_CURVE_JS = """
-var data = source_pair_fac.data;
-var f = slider_pair_fac.value;
+var data = data_container.data;
+var f = pair_factor_slider.value;
 var y0 = data['y0'];
-var y1 = data['y1'];
+var y1 = data['y1_unscaled'];
 var y1_times_f = data['y1_times_f'];
 var y_residue = data['y_residue'];
 var y_residue_ma = data['y_residue_ma'];
@@ -41,8 +42,8 @@ for (var i = 0; i < y1.length; i++) {
     }
 }
 
-// necessary because we mutated source_pair_fac.data inplace
-source_pair_fac.change.emit();
+// necessary because we mutated data_container.data inplace
+data_container.change.emit();
 """
 
 
@@ -50,131 +51,146 @@ def datetime(x):
     return np.array(x, dtype=np.datetime64)
 
 
-def gen_dashboard(ticker_tuples: tuple[str, dict]) -> Column:
-    """
-    Generates the bokeh Column layout
-    :param ticker_tuples: Tuples of price data, indexed by ticker
-    :return:
-    """
-    plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
-    colors = Spectral6
+class Dashboard:
+    PRICE_DELTA_MA_WINDOW_DAYS = 30 * 6
+    INITIAL_SLIDER_VALUE = 3.66
+    COLORS = Spectral6
 
-    # unzip ticker_tuples
-    all_ticker_name, all_ticker_data = zip(*ticker_tuples)
-    # TODO: Whilst relying on test data, assert date indexes for the pair are identical.
-    #  Update to use yfinance or other data source, and perform inner join of the pairs price frames on their date indexes.
-    if all_ticker_data[0]['date'] != all_ticker_data[1]['date']:
-        raise RuntimeError('Ticker indexes do not match')
+    def __init__(self, ticker_tuples: tuple):
+        """
+        Dashboard generator
+        :param ticker_tuples: Tuples of price data, indexed by ticker
+        """
+        self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
+        # Construct data container
+        ticker_labels, ticker_data = zip(*ticker_tuples)
+        data_container = self._generate_data_container(ticker_data)
+        # Gather plot components
+        slider_pair_fac = self._construct_slider(data_container)
+        price_plot = self._construct_price_plot(data_container, ticker_labels)
+        # residue plot x range linked with prices plot
+        residue_plot = self._construct_residue_plot(data_container, x_axis_link=price_plot.x_range)
+        # Construct plot
+        self.p_layout = gridplot([[slider_pair_fac],
+                                  [column(price_plot, residue_plot)]])
 
-    # initial slider value setting
-    s_value = 3.66
+    def _generate_data_container(self, ticker_data) -> ColumnDataSource:
+        """
+        Generates the data required for plotting
+        :param ticker_data:
+        :return:
+        """
+        # TODO: Whilst relying on test data, assert date indexes for the pair are identical.
+        #  Update to use yfinance or other data source, and perform inner join of the pairs price frames on their date indexes.
+        if ticker_data[0]['date'] != ticker_data[1]['date']:
+            raise RuntimeError('Ticker indexes do not match')
+        y0 = ticker_data[0]['adj_close']
+        y1_unscaled = ticker_data[1]['adj_close']
+        # initial y values, for dynamic components
+        y1_times_f = np.multiply(y1_unscaled, self.INITIAL_SLIDER_VALUE)
+        y_residue = y1_times_f - y0
+        # x axis values
+        x_data = datetime(ticker_data[0]['date'])
+        # container for prices data
+        data_dict = dict(x_data=x_data,
+                         x_zeros=[0] * len(x_data),
+                         y0=y0,
+                         y1_unscaled=y1_unscaled,
+                         y1_times_f=y1_times_f,
+                         y_residue=y_residue,
+                         y_residue_ma=rolling_mean(y_residue, self.PRICE_DELTA_MA_WINDOW_DAYS))
+        return ColumnDataSource(data=data_dict)
 
-    _init_y0 = all_ticker_data[0]['adj_close']
-    _init_y1 = all_ticker_data[1]['adj_close']
+    def _construct_slider(self, data_container: ColumnDataSource) -> Slider:
+        """
+        Constructs slider for pairs multiplier factor
+        :return:
+        """
+        # TODO: intelligent calculation of initial slider parameters
+        slider_params = {'start': 0.1,
+                         'end': 10.,
+                         'value': self.INITIAL_SLIDER_VALUE}
+        s_step = (slider_params['start'] - slider_params['end']) / 50
+        pair_factor_slider = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
-    # initial values, for dynamic components
-    _init_y1_times_f = np.multiply(_init_y1, s_value)
-    _init_y_residue = _init_y1_times_f - _init_y0
+        # Slider updates y1_times_f = y1 * factor
+        update_price_curve = CustomJS(args=dict(data_container=data_container,
+                                                pair_factor_slider=pair_factor_slider),
+                                      code=UPDATE_PRICE_CURVE_JS)
+        pair_factor_slider.js_on_change('value', update_price_curve)
+        return pair_factor_slider
 
-    # window size for price delta moving average
-    window_size = 30*6
+    def _construct_price_plot(self,
+                              data_container: ColumnDataSource,
+                              ticker_labels: tuple):
+        """
+        Constructs price plot (target of slider)
+        :return:
+        """
+        price_plot = figure(x_axis_type="datetime", title="Stock Closing Prices",
+                             **self.plot_options)
+        # Plot prices
+        price_plot.line("x_data", "y0",
+                        source=data_container,
+                        muted_alpha=0.2,
+                        color=self.COLORS[0],
+                        legend_label=ticker_labels[0])
+        price_plot.line("x_data", "y1_times_f",
+                        muted_alpha=0.2,
+                        source=data_container,
+                        color=self.COLORS[1],
+                        legend_label=ticker_labels[1])
 
-    # x axis values
-    x_data = datetime(all_ticker_data[0]['date'])
+        price_plot.grid.grid_line_alpha = 0.3
+        price_plot.xaxis.axis_label = 'Date'
+        price_plot.yaxis.axis_label = 'Price'
+        price_plot.legend.location = "top_left"
+        price_plot.legend.click_policy="mute"
+        return price_plot
 
-    # container for prices data
-    data_dict_prices = dict(x_data=x_data,
-                            x_zeros = [0]*len(x_data),
-                            y0=_init_y0,
-                            y1=_init_y1,
-                            y1_times_f=_init_y1_times_f,
-                            y_residue=_init_y_residue,
-                            y_residue_ma=rolling_mean(_init_y_residue, window_size))
+    def _construct_residue_plot(self,
+                                data_container: ColumnDataSource,
+                                x_axis_link: DataRange1d):
+        """
+        Constructs residue plot (target of slider)
+        :param x_axis_link: x axis object to couple this plot with
+        :return:
+        """
+        plot_residue = figure(x_axis_type="datetime", title="Pair Price Delta",
+                              x_range=x_axis_link,
+                              **self.plot_options)
 
-    '''
-    Slider for pairs multiplier factor
-    '''
+        # horizontal line
+        hline = Span(location=0, dimension='width', line_color='black', line_width=1)
+        plot_residue.renderers.extend([hline])
 
-    # data container
-    source_pair_fac = ColumnDataSource(data=data_dict_prices)
+        # moving average of residue series
+        plot_residue.line("x_data", "y_residue_ma",
+                          source=data_container,
+                          color='gray',
+                          muted_alpha=0.2,
+                          alpha=0.5,
+                          line_width=1.5,
+                          legend_label=f'{self.PRICE_DELTA_MA_WINDOW_DAYS}D MA')
 
-    # TODO: intelligent calculation of initial slider parameters
-    s_start = 0.1
-    s_end = 10.
-    s_step = (s_end - s_start) / 50
-    slider_pair_fac = Slider(start=s_start, end=s_end, value=s_value, step=s_step, title="Pairs Price Factor")
+        # residue series
+        plot_residue.line("x_data", "y_residue",
+                          source=data_container,
+                          color=self.COLORS[0],
+                          legend_label='Price delta')
+        band = Band(base='x_data', lower='x_zeros', upper='y_residue', source=data_container, level='underlay',
+                    fill_alpha=0.2, fill_color='#55FF88')
+        plot_residue.add_layout(band)
 
-    # Slider: updates y1_times_f = y1 * factor
-    update_price_curve = CustomJS(args=dict(source_pair_fac=source_pair_fac,
-                                            slider_pair_fac=slider_pair_fac),
-                                  code=UPDATE_PRICE_CURVE_JS)
-    slider_pair_fac.js_on_change('value', update_price_curve)
+        plot_residue.grid.grid_line_alpha = 0.3
+        plot_residue.xaxis.axis_label = 'Date'
+        plot_residue.yaxis.axis_label = r'$$\Delta \mathrm{Price}$$'
+        plot_residue.legend.location = 'bottom_left'
+        return plot_residue
 
-    '''
-    Plot prices (is target of slider)
-    '''
-
-    plot_prices = figure(x_axis_type="datetime", title="Stock Closing Prices",
-                         **plot_options)
-
-    # 1st ticker
-    plot_prices.line("x_data", "y0",
-                     source=source_pair_fac,
-                     muted_alpha=0.2,
-                     color=colors[0],
-                     legend_label=all_ticker_name[0])
-    # 2nd ticker
-    plot_prices.line("x_data", "y1_times_f",
-                     muted_alpha=0.2,
-                     source=source_pair_fac,
-                     color=colors[1],
-                     legend_label=all_ticker_name[1])
-
-    plot_prices.grid.grid_line_alpha = 0.3
-    plot_prices.xaxis.axis_label = 'Date'
-    plot_prices.yaxis.axis_label = 'Price'
-    plot_prices.legend.location = "top_left"
-    plot_prices.legend.click_policy="mute"
-
-    '''
-    Plot residue (is target of slider)
-    '''
-
-    # linked x range with plot_prices
-    plot_residue = figure(x_axis_type="datetime", title="Pair Price Delta",
-                          x_range=plot_prices.x_range,
-                          **plot_options)
-
-    # horizontal line
-    from bokeh.models import Span
-    hline = Span(location=0, dimension='width', line_color='black', line_width=1)
-    plot_residue.renderers.extend([hline])
-
-    # the residue data moving average
-    plot_residue.line("x_data", "y_residue_ma",
-                      source=source_pair_fac,
-                      color='gray',
-                      muted_alpha=0.2,
-                      alpha=0.5,
-                      line_width=1.5,
-                      legend_label=f'{window_size}D MA')
-
-    # the residue data
-    plot_residue.line("x_data", "y_residue",
-                      source=source_pair_fac,
-                      color=colors[0],
-                      legend_label='Price Delta')
-
-    band = Band(base='x_data', lower='x_zeros', upper='y_residue', source=source_pair_fac, level='underlay',
-                fill_alpha=0.2, fill_color='#55FF88')
-    plot_residue.add_layout(band)
-
-    plot_residue.grid.grid_line_alpha = 0.3
-    plot_residue.xaxis.axis_label = 'Date'
-    plot_residue.yaxis.axis_label = 'Price'
-    plot_residue.legend.location = 'bottom_left'
-
-    p = gridplot([[slider_pair_fac],
-                  [column(plot_prices,plot_residue)]])
-
-    return p
+    def get_plot(self) -> Column:
+        """
+        Returns the bokeh Column layout
+        :return:
+        """
+        return self.p_layout
