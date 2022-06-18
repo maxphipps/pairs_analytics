@@ -20,6 +20,10 @@ def gen_dashboard(ticker_tups):
 
     # unzip ticker_tups
     all_ticker_name, all_ticker_data = zip(*ticker_tups)
+    # TODO: Whilst relying on test data, assert date indexes for the pair are identical.
+    #  Update to use yfinance or other data source, and perform inner join of the pairs price frames on their date indexes.
+    if all_ticker_data[0]['date'] != all_ticker_data[1]['date']:
+        raise RuntimeError('Ticker indexes do not match')
 
     # initial slider value setting
     s_value = 3.66
@@ -32,11 +36,11 @@ def gen_dashboard(ticker_tups):
     _init_y1_times_f = np.multiply(_init_y1, s_value)
     _init_y_residue = _init_y1_times_f - _init_y0
 
-    # Window size for price delta moving average
+    # window size for price delta moving average
     window_size = 30*6
 
-    # x axis values for price residue plot
-    x_residue = datetime(all_ticker_data[0]['date'])
+    # x axis values
+    x_data = datetime(all_ticker_data[0]['date'])
 
     # container for prices data
     # data_dict = {}
@@ -44,15 +48,12 @@ def gen_dashboard(ticker_tups):
     #     ticker_name, ticker_data = ticker_tup
     #     data_dict[ticker_name] = ticker_data
     # the x and y for plotting tickers 1 and 2
-    data_dict_prices = dict(x0=datetime(all_ticker_data[0]['date']),
+    data_dict_prices = dict(x_data=x_data,
+                            x_zeros = [0]*len(x_data),
                             y0=_init_y0,
-                            x1=datetime(all_ticker_data[1]['date']),
                             y1=_init_y1,
                             y1_times_f=_init_y1_times_f,
-                            x_residue=x_residue,
                             y_residue=_init_y_residue,
-                            # x_residue_ma=x_residue[window_size:],
-                            x_residue_ma=x_residue,
                             y_residue_ma=rolling_mean(_init_y_residue, window_size),
                             )
 
@@ -126,12 +127,14 @@ def gen_dashboard(ticker_tups):
     #                      legend_label=ticker_name)
 
     # 1st ticker
-    plot_prices.line("x0", "y0",
+    plot_prices.line("x_data", "y0",
                      source=source_pairFac,
+                     muted_alpha=0.2,
                      color=colors[0],
                      legend_label=all_ticker_name[0])
     # 2nd ticker
-    plot_prices.line("x1", "y1_times_f",
+    plot_prices.line("x_data", "y1_times_f",
+                     muted_alpha=0.2,
                      source=source_pairFac,
                      color=colors[1],
                      legend_label=all_ticker_name[1])
@@ -140,47 +143,49 @@ def gen_dashboard(ticker_tups):
     plot_prices.xaxis.axis_label = 'Date'
     plot_prices.yaxis.axis_label = 'Price'
     plot_prices.legend.location = "top_left"
+    plot_prices.legend.click_policy="mute"
 
 
     '''
     Plot residue (is target of slider)
     '''
 
-    # Linked x range with plot_prices
+    # linked x range with plot_prices
     plot_residue = figure(x_axis_type="datetime", title="Pair Price Delta",
-                          x_range = plot_prices.x_range,
+                          x_range=plot_prices.x_range,
                           **plot_options)
 
-    # Horizontal line
+    # horizontal line
     from bokeh.models import Span
     hline = Span(location=0, dimension='width', line_color='black', line_width=1)
     plot_residue.renderers.extend([hline])
 
     # the residue data moving average
-    plot_residue.line("x_residue_ma", "y_residue_ma",
+    plot_residue.line("x_data", "y_residue_ma",
                       source=source_pairFac,
                       color='gray',
+                      muted_alpha=0.2,
                       alpha=0.5,
                       line_width=1.5,
                       legend_label=f'{window_size}D MA',
                       )
 
     # the residue data
-    plot_residue.line("x_residue", "y_residue",
+    plot_residue.line("x_data", "y_residue",
                       source=source_pairFac,
                       color=colors[0],
                       legend_label='Price Delta',
                       )
 
     #
-    band = Band(base='x_residue', upper='y_residue', source=source_pairFac, level='underlay',
+    band = Band(base='x_data', lower='x_zeros', upper='y_residue', source=source_pairFac, level='underlay',
                 fill_alpha=0.2, fill_color='#55FF88')
     plot_residue.add_layout(band)
 
     plot_residue.grid.grid_line_alpha = 0.3
     plot_residue.xaxis.axis_label = 'Date'
     plot_residue.yaxis.axis_label = 'Price'
-    plot_residue.legend.location = "top_left"
+    plot_residue.legend.location = 'bottom_left'
 
     # '''
     # Plot moving average
