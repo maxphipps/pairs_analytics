@@ -1,21 +1,11 @@
 from bokeh.plotting import figure
 import numpy as np
 
+from utils.math_utils import rolling_mean
+
 
 def datetime(x):
     return np.array(x, dtype=np.datetime64)
-
-
-def rolling_mean(x, n):
-    # x_zero_filled = np.insert(x, 0, 0)
-    # x_zero_filled = x
-    # cumsum = np.cumsum(x_zero_filled)
-    # return (cumsum[n:] - cumsum[:-n]) / float(n)
-    ret = np.cumsum(x, dtype=float)
-    ret[n:] = ret[n:] - ret[:-n]
-    ret = ret[n - 1:] / n
-    # Append Nones so length matches length of x
-    return np.insert(ret, 0, [0]*(n-1))
 
 
 def gen_dashboard(ticker_tups):
