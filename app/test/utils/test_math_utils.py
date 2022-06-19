@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
 
-from utils.math_utils import rolling_mean
+from app.utils.math_utils import rolling_mean
 
 
 def nan_equal(a, b):

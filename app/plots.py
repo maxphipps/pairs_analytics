@@ -5,8 +5,9 @@ from bokeh.models.layouts import Column
 from bokeh.models.ranges import DataRange1d
 from bokeh.palettes import Spectral6
 import numpy as np
+import pandas as pd
 
-from utils.math_utils import rolling_mean
+from app.utils.math_utils import rolling_mean
 
 """
 Main plot routines
@@ -53,44 +54,39 @@ def datetime(x):
 
 class Dashboard:
     PRICE_DELTA_MA_WINDOW_DAYS = 30 * 6
-    INITIAL_SLIDER_VALUE = 3.66
+    INITIAL_SLIDER_VALUE = 2.87
     COLORS = Spectral6
 
-    def __init__(self, ticker_tuples: tuple):
+    def __init__(self, df_prices: pd.DataFrame):
         """
         Dashboard generator
-        :param ticker_tuples: Tuples of price data, indexed by ticker
+        :param df_prices: Dataframe of price data, indexed by ticker label
         """
         self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
         # Construct data container
-        ticker_labels, ticker_data = zip(*ticker_tuples)
-        data_container = self._generate_data_container(ticker_data)
+        data_container = self._generate_data_container(df_prices)
         # Gather plot components
         slider_pair_fac = self._construct_slider(data_container)
-        price_plot = self._construct_price_plot(data_container, ticker_labels)
+        price_plot = self._construct_price_plot(data_container, df_prices.columns)
         # residue plot x range linked with prices plot
         residue_plot = self._construct_residue_plot(data_container, x_axis_link=price_plot.x_range)
         # Construct plot
         self.p_layout = gridplot([[slider_pair_fac],
                                   [column(price_plot, residue_plot)]])
 
-    def _generate_data_container(self, ticker_data) -> ColumnDataSource:
+    def _generate_data_container(self, df_prices: pd.DataFrame) -> ColumnDataSource:
         """
         Generates the data required for plotting
-        :param ticker_data:
+        :param df_prices:
         :return:
         """
-        # TODO: Whilst relying on test data, assert date indexes for the pair are identical.
-        #  Update to use yfinance or other data source, and perform inner join of the pairs price frames on their date indexes.
-        if ticker_data[0]['date'] != ticker_data[1]['date']:
-            raise RuntimeError('Ticker indexes do not match')
-        y0 = ticker_data[0]['adj_close']
-        y1_unscaled = ticker_data[1]['adj_close']
+        y0 = df_prices.iloc[:, 0].values
+        y1_unscaled = df_prices.iloc[:, 1].values
         # initial y values, for dynamic components
         y1_times_f = np.multiply(y1_unscaled, self.INITIAL_SLIDER_VALUE)
         y_residue = y1_times_f - y0
         # x axis values
-        x_data = datetime(ticker_data[0]['date'])
+        x_data = datetime(df_prices.index)
         # container for prices data
         data_dict = dict(x_data=x_data,
                          x_zeros=[0] * len(x_data),

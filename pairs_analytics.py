@@ -8,7 +8,9 @@ from bokeh.themes import Theme
 from bokeh.sampledata.stocks import AAPL, GOOG, IBM, MSFT
 
 from app.plots import Dashboard
+from app.utils.file_utils import load_data
 
+from os.path import dirname, join
 
 # To deploy on Heroku:
 # FLASK + BOKEH + HEROKU =>
@@ -16,11 +18,11 @@ from app.plots import Dashboard
 
 
 def bkapp(doc):
-    plot_dashboard_obj = Dashboard(ticker_tuples=(#('AAPL', AAPL),
-                                                   #('GOOG', GOOG),
-                                                   ('IBM', IBM),
-                                                   ('MSFT', MSFT),
-                                                   )).get_plot()
+    # TODO: Add data pull utility via yfinance/other API
+    RDSA = load_data(join(dirname(__file__), 'app/data', 'RDSA.L.csv')).set_index('Date')['Adj Close'].rename('RDSA.L')
+    BP = load_data(join(dirname(__file__), 'app/data', 'BP.L.csv')).set_index('Date')['Adj Close'].rename('BP.L')
+    df_prices = RDSA.to_frame().join(BP.to_frame(), how='inner')
+    plot_dashboard_obj = Dashboard(df_prices).get_plot()
 
     doc.add_root(plot_dashboard_obj)
     doc.theme = Theme(filename="theme.yaml")
