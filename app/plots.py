@@ -7,7 +7,7 @@ from bokeh.palettes import Spectral6
 import numpy as np
 import pandas as pd
 
-from app.utils.math_utils import rolling_mean
+from app.utils.model_utils import calculate_dynamic_data
 
 """
 Main plot routines
@@ -40,7 +40,7 @@ class Dashboard:
         self.p_layout = gridplot([[self.slider_pair_fac],
                                   [column(self.price_plot, self.residue_plot)]])
 
-    def _generate_data_container(self, df_prices: pd.DataFrame) -> ColumnDataSource:
+    def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
         """
         Generates the data required for plotting
         :param df_prices:
@@ -52,18 +52,9 @@ class Dashboard:
         df['x_data'] = datetime(df_prices.index)
         df['x_zeros'] = 0.
         self.data_container = ColumnDataSource(data=df)
-        self._update_dynamic_data(self.INITIAL_SLIDER_VALUE)
+        calculate_dynamic_data(self.data_container.data, self.INITIAL_SLIDER_VALUE, self.PRICE_DELTA_MA_WINDOW_DAYS)
 
-    def _update_dynamic_data(self, slider_value):
-        """
-        Calculates dynamic pairs model values
-        :return:
-        """
-        self.data_container.data['y1_times_f'] = np.multiply(self.data_container.data['y1_unscaled'], slider_value)
-        self.data_container.data['y_residue'] = self.data_container.data['y1_times_f'] - self.data_container.data['y0']
-        self.data_container.data['y_residue_ma'] = rolling_mean(self.data_container.data['y_residue'], self.PRICE_DELTA_MA_WINDOW_DAYS)
-
-    def _construct_slider(self) -> Slider:
+    def _construct_slider(self) -> None:
         """
         Constructs slider for pairs multiplier factor
         :return:
@@ -76,7 +67,9 @@ class Dashboard:
         self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
         def pair_factor_callback(attr, old, new):
-            self._update_dynamic_data(new)
+            calculate_dynamic_data(data=self.data_container.data,
+                                   scale_factor=new,
+                                   ma_window_days=self.PRICE_DELTA_MA_WINDOW_DAYS)
 
         self.slider_pair_fac.on_change('value', pair_factor_callback)
 
