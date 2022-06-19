@@ -51,8 +51,9 @@ class Dashboard:
         df['y1_unscaled'] = df_prices.iloc[:, 1]
         df['x_data'] = datetime(df_prices.index)
         df['x_zeros'] = 0.
+        df['scale_factor'] = self.INITIAL_SLIDER_VALUE
         self.data_container = ColumnDataSource(data=df)
-        calculate_dynamic_data(self.data_container.data, self.INITIAL_SLIDER_VALUE, self.PRICE_DELTA_MA_WINDOW_DAYS)
+        calculate_dynamic_data(self.data_container.data,  self.PRICE_DELTA_MA_WINDOW_DAYS)
 
     def _construct_slider(self) -> None:
         """
@@ -67,8 +68,8 @@ class Dashboard:
         self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
         def pair_factor_callback(attr, old, new):
+            self.data_container.data['scale_factor'] = np.array([new] * self.data_len)
             calculate_dynamic_data(data=self.data_container.data,
-                                   scale_factor=new,
                                    ma_window_days=self.PRICE_DELTA_MA_WINDOW_DAYS)
 
         self.slider_pair_fac.on_change('value', pair_factor_callback)
