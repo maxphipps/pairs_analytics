@@ -29,11 +29,13 @@ class Dashboard:
         :param df_prices: Dataframe of price data, indexed by ticker label
         """
         self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
+        self.ticker_labels = df_prices.columns
+        self.data_len = len(df_prices)
         # Construct data container
         self._generate_data_container(df_prices)
         # Gather plot components
         self._construct_slider()
-        self._construct_price_plot(df_prices.columns)
+        self._construct_price_plot()
         # residue plot x range linked with prices plot
         self._construct_residue_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
@@ -74,8 +76,7 @@ class Dashboard:
 
         self.slider_pair_fac.on_change('value', pair_factor_callback)
 
-    def _construct_price_plot(self,
-                              ticker_labels: tuple):
+    def _construct_price_plot(self):
         """
         Constructs price plot (target of slider)
         :return:
@@ -83,16 +84,16 @@ class Dashboard:
         self.price_plot = figure(x_axis_type="datetime", title="Stock Closing Prices",
                                  **self.plot_options)
         # Plot prices
-        self.price_plot.line("x_data", "y0",
-                             source=self.data_container,
-                             muted_alpha=0.2,
-                             color=self.COLORS[0],
-                             legend_label=ticker_labels[0])
-        self.price_plot.line("x_data", "y1_times_f",
-                             muted_alpha=0.2,
-                             source=self.data_container,
-                             color=self.COLORS[1],
-                             legend_label=ticker_labels[1])
+        line0 = self.price_plot.line("x_data", "y0",
+                                     source=self.data_container,
+                                     muted_alpha=0.2,
+                                     color=self.COLORS[0],
+                                     legend_label=self.ticker_labels[0])
+        line1 = self.price_plot.line("x_data", "y1_times_f",
+                                     muted_alpha=0.2,
+                                     source=self.data_container,
+                                     color=self.COLORS[1],
+                                     legend_label=self.ticker_labels[1])
 
         self.price_plot.grid.grid_line_alpha = 0.3
         self.price_plot.xaxis.axis_label = 'Date'
