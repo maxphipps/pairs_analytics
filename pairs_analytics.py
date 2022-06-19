@@ -22,7 +22,7 @@ def bkapp(doc):
     RDSA = load_data(join(dirname(__file__), 'app/data', 'RDSA.L.csv')).set_index('Date')['Adj Close'].rename('RDSA.L')
     BP = load_data(join(dirname(__file__), 'app/data', 'BP.L.csv')).set_index('Date')['Adj Close'].rename('BP.L')
     df_prices = RDSA.to_frame().join(BP.to_frame(), how='inner')
-    plot_dashboard_obj = Dashboard(df_prices).get_plot()
+    plot_dashboard_obj = Dashboard(df_prices).get_layout()
 
     doc.add_root(plot_dashboard_obj)
     doc.theme = Theme(filename="theme.yaml")
