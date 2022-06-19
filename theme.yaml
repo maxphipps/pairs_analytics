@@ -1,0 +1,7 @@
+attrs:
+    Figure:
+        background_fill_color: white
+        outline_line_color: white
+        toolbar_location: above
+        height: 500
+        width: 800
