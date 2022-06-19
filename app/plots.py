@@ -46,16 +46,12 @@ class Dashboard:
         :param df_prices:
         :return:
         """
-        y0 = df_prices.iloc[:, 0].values
-        y1_unscaled = df_prices.iloc[:, 1].values
-        # x axis values
-        x_data = datetime(df_prices.index)
-        # container for prices data
-        data_dict = dict(x_data=x_data,
-                         x_zeros=[0] * len(x_data),
-                         y0=y0,
-                         y1_unscaled=y1_unscaled)
-        self.data_container = ColumnDataSource(data=data_dict)
+        df = pd.DataFrame(index=df_prices.index)
+        df['y0'] = df_prices.iloc[:, 0]
+        df['y1_unscaled'] = df_prices.iloc[:, 1]
+        df['x_data'] = datetime(df_prices.index)
+        df['x_zeros'] = 0.
+        self.data_container = ColumnDataSource(data=df)
         self._update_dynamic_data(self.INITIAL_SLIDER_VALUE)
 
     def _update_dynamic_data(self, slider_value):
