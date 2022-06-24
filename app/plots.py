@@ -63,8 +63,8 @@ class Dashboard:
         :return:
         """
         # TODO: intelligent calculation of initial slider parameters
-        slider_params = {'start': 0.1,
-                         'end': 10.,
+        slider_params = {'start': 0.1*self.INITIAL_SLIDER_VALUE,
+                         'end': 10.*self.INITIAL_SLIDER_VALUE,
                          'value': self.INITIAL_SLIDER_VALUE}
         s_step = (slider_params['start'] - slider_params['end']) / 50
         self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
