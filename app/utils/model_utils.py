@@ -42,8 +42,6 @@ def scan_discontinuities(data: dict,
     r_scale_factor = initial_scale_factor
     for discontinuity_idx in range(idx_min, idx_max, skip):
         # TODO: After grid search, perform local search
-
-        # TODO: Duplicated in plots.py. Extract this.
         # Find closest discontinuities previously found
         # Next is supremum (if exists)
         mask = discontinuity_idx_ser > discontinuity_idx

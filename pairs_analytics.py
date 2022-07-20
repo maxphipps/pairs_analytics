@@ -19,6 +19,8 @@ def bkapp(doc):
     # TODO: Add data pull utility via yfinance/other API
 
     tickers = ('RDSA.L', 'BP.L')
+    # tickers = ('NG.L', 'SSE.L')
+
     ticker1_ser = load_data(join(dirname(__file__), 'app/data', f'{tickers[0]}.csv')).rename(tickers[0])
     ticker2_ser = load_data(join(dirname(__file__), 'app/data', f'{tickers[1]}.csv')).rename(tickers[1])
     df_prices = ticker1_ser.to_frame().join(ticker2_ser.to_frame(), how='inner')

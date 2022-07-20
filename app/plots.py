@@ -104,13 +104,10 @@ class Dashboard:
                 self.optimisation_line.visible = False
 
             # Plot results summary on secondary axis
-            self.optimisation_line = self.price_plot.line("x_timestamp", "norm_net_cost",
-                                 y_range_name="OptimisationScore",
-                                 muted_alpha=0.2,
-                                 source=ColumnDataSource.from_df(res),
-                                 color='gray',
-                                 # legend_label='Discontinuity Optimisation Cost'
-                                 )
+            line_kwargs = {'y_range_name': 'OptimisationScore', 'muted_alpha': 0.2,
+                           'source': ColumnDataSource.from_df(res), 'color': 'gray'}
+                           # 'legend_label': 'Discontinuity Optimisation Cost'
+            self.optimisation_line = self.price_plot.line("x_timestamp", "norm_net_cost", **line_kwargs)
 
             # Extract optimised values
             # Exclude previously identified discontinuities
