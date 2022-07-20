@@ -5,8 +5,6 @@ from app import app
 from bokeh.server.server import Server
 from bokeh.themes import Theme
 
-from bokeh.sampledata.stocks import AAPL, GOOG, IBM, MSFT
-
 from app.plots import Dashboard
 from app.utils.file_utils import load_data
 
@@ -19,10 +17,14 @@ from os.path import dirname, join
 
 def bkapp(doc):
     # TODO: Add data pull utility via yfinance/other API
-    RDSA = load_data(join(dirname(__file__), 'app/data', 'RDSA.L.csv')).set_index('Date')['Adj Close'].rename('RDSA.L')
-    BP = load_data(join(dirname(__file__), 'app/data', 'BP.L.csv')).set_index('Date')['Adj Close'].rename('BP.L')
-    df_prices = RDSA.to_frame().join(BP.to_frame(), how='inner')
-    plot_dashboard_obj = Dashboard(df_prices).get_layout()
+
+    tickers = ('RDSA.L', 'BP.L')
+    ticker1_ser = load_data(join(dirname(__file__), 'app/data', f'{tickers[0]}.csv')).rename(tickers[0])
+    ticker2_ser = load_data(join(dirname(__file__), 'app/data', f'{tickers[1]}.csv')).rename(tickers[1])
+    df_prices = ticker1_ser.to_frame().join(ticker2_ser.to_frame(), how='inner')
+    df_prices = df_prices.reset_index()
+
+    plot_dashboard_obj = Dashboard(df_prices, ticker_labels=[ticker1_ser.name, ticker2_ser.name]).get_layout()
 
     doc.add_root(plot_dashboard_obj)
     doc.theme = Theme(filename="theme.yaml")

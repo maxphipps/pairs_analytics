@@ -23,13 +23,13 @@ class Dashboard:
     INITIAL_SLIDER_VALUE = 2.87
     COLORS = Spectral6
 
-    def __init__(self, df_prices: pd.DataFrame):
+    def __init__(self, df_prices: pd.DataFrame, ticker_labels: tuple):
         """
         Dashboard generator
         :param df_prices: Dataframe of price data, indexed by ticker label
         """
         self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
-        self.ticker_labels = df_prices.columns
+        self.ticker_labels = ticker_labels
         self.data_len = len(df_prices)
         # Construct data container
         self._generate_data_container(df_prices)
@@ -49,9 +49,9 @@ class Dashboard:
         :return:
         """
         df = pd.DataFrame(index=df_prices.index)
-        df['y0'] = df_prices.iloc[:, 0]
-        df['y1_unscaled'] = df_prices.iloc[:, 1]
-        df['x_data'] = datetime(df_prices.index)
+        df['y0'] = df_prices.loc[:, self.ticker_labels[0]]
+        df['y1_unscaled'] = df_prices.loc[:, self.ticker_labels[1]]
+        df['x_data'] = datetime(df_prices['Date'])
         df['x_zeros'] = 0.
         df['scale_factor'] = self.INITIAL_SLIDER_VALUE
         self.data_container = ColumnDataSource(data=df)
