@@ -20,7 +20,6 @@ def datetime(x):
 
 class Dashboard:
     PRICE_DELTA_MA_WINDOW_DAYS = 30 * 6
-    INITIAL_SLIDER_VALUE = 2.87
     COLORS = Spectral6
 
     def __init__(self, df_prices: pd.DataFrame, ticker_labels: tuple):
@@ -53,7 +52,8 @@ class Dashboard:
         df['y1_unscaled'] = df_prices.loc[:, self.ticker_labels[1]]
         df['x_data'] = datetime(df_prices['Date'])
         df['x_zeros'] = 0.
-        df['scale_factor'] = self.INITIAL_SLIDER_VALUE
+        self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
+        df['scale_factor'] = self.initial_slider_value
         self.data_container = ColumnDataSource(data=df)
         calculate_dynamic_data(self.data_container.data,  self.PRICE_DELTA_MA_WINDOW_DAYS)
 
@@ -63,9 +63,9 @@ class Dashboard:
         :return:
         """
         # TODO: intelligent calculation of initial slider parameters
-        slider_params = {'start': 0.1*self.INITIAL_SLIDER_VALUE,
-                         'end': 10.*self.INITIAL_SLIDER_VALUE,
-                         'value': self.INITIAL_SLIDER_VALUE}
+        slider_params = {'start': 0.5*self.initial_slider_value,
+                         'end': 2.*self.initial_slider_value,
+                         'value': self.initial_slider_value}
         s_step = (slider_params['start'] - slider_params['end']) / 50
         self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
