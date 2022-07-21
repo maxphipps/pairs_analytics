@@ -2,7 +2,7 @@ from unittest import TestCase
 import numpy as np
 import copy
 
-from model_utils import calculate_dynamic_data
+from app.utils.model_utils import calculate_dynamic_data
 
 
 class test_calculate_dynamic_data(TestCase):
