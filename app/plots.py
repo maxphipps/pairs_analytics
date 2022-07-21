@@ -37,13 +37,13 @@ class Dashboard:
         self._construct_slider()
         self._construct_discontinuity_button()
         self._construct_price_plot()
-        self._construct_scale_factor_plot()
         self._init_aux_handles()
         # residue plot x range linked with prices plot
+        self._construct_scale_factor_plot(x_axis_link=self.price_plot.x_range)
         self._construct_residue_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
         self.p_layout = gridplot([[row(self.slider_pair_fac, self.discontinuity_button)],
-                                  [column(self.price_plot, self.residue_plot, self.scale_factor_plot)]])
+                                  [column(self.price_plot, self.scale_factor_plot, self.residue_plot)]])
 
     def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
         """
@@ -151,16 +151,10 @@ class Dashboard:
         self.price_plot = figure(x_axis_type="datetime", title="Stock Closing Prices",
                                  **self.plot_options)
         # Plot prices
-        line0 = self.price_plot.line("x_data", "y0",
-                                     source=self.data_container,
-                                     muted_alpha=0.2,
-                                     color=self.COLORS[0],
-                                     legend_label=self.ticker_labels[0])
-        line1 = self.price_plot.line("x_data", "y1_times_f",
-                                     muted_alpha=0.2,
-                                     source=self.data_container,
-                                     color=self.COLORS[1],
-                                     legend_label=self.ticker_labels[1])
+        line0 = self.price_plot.line("x_data", "y0", source=self.data_container, muted_alpha=0.2,
+                                     color=self.COLORS[0], legend_label=self.ticker_labels[0])
+        line1 = self.price_plot.line("x_data", "y1_times_f", muted_alpha=0.2, source=self.data_container,
+                                     color=self.COLORS[1], legend_label=self.ticker_labels[1])
 
         self.price_plot.grid.grid_line_alpha = 0.3
         self.price_plot.xaxis.axis_label = 'Date'
@@ -176,12 +170,14 @@ class Dashboard:
         self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
                                               axis_label="Optimisation Score"), 'right')
 
-    def _construct_scale_factor_plot(self):
+    def _construct_scale_factor_plot(self, x_axis_link: DataRange1d):
         """
         Constructs scale factor plot
+        :param x_axis_link: x axis object to couple this plot with
         :return:
         """
-        self.scale_factor_plot = figure(x_axis_type="datetime", title="Portfolio Weights", **self.plot_options)
+        self.scale_factor_plot = figure(x_axis_type="datetime", title="Portfolio Weights", x_range=x_axis_link,
+                                        **self.plot_options)
         line = self.scale_factor_plot.line("x_data", "scale_factor", source=self.data_container, color=self.COLORS[0])
 
         self.scale_factor_plot.grid.grid_line_alpha = 0.3
@@ -199,8 +195,7 @@ class Dashboard:
         :param x_axis_link: x axis object to couple this plot with
         :return:
         """
-        self.residue_plot = figure(x_axis_type="datetime", title="Pair Price Delta",
-                                   x_range=x_axis_link,
+        self.residue_plot = figure(x_axis_type="datetime", title="Pair Price Delta", x_range=x_axis_link,
                                    **self.plot_options)
 
         # horizontal line
@@ -208,18 +203,11 @@ class Dashboard:
         self.residue_plot.renderers.extend([hline])
 
         # moving average of residue series
-        self.residue_plot.line("x_data", "y_residue_ma",
-                               source=self.data_container,
-                               color='gray',
-                               muted_alpha=0.2,
-                               alpha=0.5,
-                               line_width=1.5,
-                               legend_label=f'{self.PRICE_DELTA_MA_WINDOW_DAYS}D MA')
+        self.residue_plot.line("x_data", "y_residue_ma", source=self.data_container, color='gray', muted_alpha=0.2,
+                               alpha=0.5, line_width=1.5, legend_label=f'{self.PRICE_DELTA_MA_WINDOW_DAYS}D MA')
 
         # residue series
-        self.residue_plot.line("x_data", "y_residue",
-                               source=self.data_container,
-                               color=self.COLORS[0],
+        self.residue_plot.line("x_data", "y_residue", source=self.data_container, color=self.COLORS[0],
                                legend_label='Price delta')
         band = Band(base='x_data', lower='x_zeros', upper='y_residue', source=self.data_container, level='underlay',
                     fill_alpha=0.2, fill_color='#55FF88')
