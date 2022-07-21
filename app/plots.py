@@ -31,7 +31,7 @@ class Dashboard:
         self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
         self.ticker_labels = ticker_labels
         self.data_len = len(df_prices)
-        self.discontinuity_idx_ser = pd.Series(dtype=int)
+        self.discontinuity_idx_list = list()
         # Construct data container
         self._generate_data_container(df_prices)
         # Gather plot components
@@ -97,7 +97,8 @@ class Dashboard:
             self.data_container.data['y_residue_ma'] = [None] * self.data_len
 
             # Scan space of possible discontinuities
-            res = scan_discontinuities(self.data_container.data, self.slider_pair_fac.value, self.discontinuity_idx_ser)
+            res = scan_discontinuities(self.data_container.data, self.slider_pair_fac.value,
+                                       pd.Series(self.discontinuity_idx_list, dtype=int))
 
             # Hide old optimisation line
             if self.optimisation_line:
@@ -111,7 +112,7 @@ class Dashboard:
 
             # Extract optimised values
             # Exclude previously identified discontinuities
-            is_new_discontinuity = ~res['discontinuity_idx'].isin(self.discontinuity_idx_ser)
+            is_new_discontinuity = ~res['discontinuity_idx'].isin(self.discontinuity_idx_list)
             _idxmin = res['norm_net_cost'][is_new_discontinuity].astype(float).idxmin()
             opt_vals = res.loc[_idxmin]  # idxmin uses loc
             opt_x = opt_vals['x_timestamp']
@@ -128,7 +129,7 @@ class Dashboard:
             discontinuity_idx_next = opt_vals['discontinuity_idx_next']
 
             # Add newly identified discontinuity to master list
-            self.discontinuity_idx_ser = self.discontinuity_idx_ser.append(pd.Series([discontinuity_idx]))
+            self.discontinuity_idx_list.append(discontinuity_idx)
 
             df_data.loc[discontinuity_idx_prev:discontinuity_idx, 'scale_factor'] = opt_vals['l_scale_factor']
             df_data.loc[discontinuity_idx:discontinuity_idx_next, 'scale_factor'] = opt_vals['r_scale_factor']

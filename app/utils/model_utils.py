@@ -18,7 +18,7 @@ def calculate_dynamic_data(data: dict,
 
 def scan_discontinuities(data: dict,
                          initial_scale_factor: float,
-                         discontinuity_idx_ser: list):
+                         discontinuity_idx_ser: pd.Series):
     """
     Performs grid search for possible discontinuities
     Algorithm:
@@ -35,9 +35,7 @@ def scan_discontinuities(data: dict,
     skip = int(data_len / num_samples)
     idx_min = skip
     idx_max = data_len - skip
-    results = pd.DataFrame(columns=['l_scale_factor', 'r_scale_factor',
-                                    'l_cost', 'r_cost',
-                                    'net_cost'])
+    results_list = list()
     l_scale_factor = initial_scale_factor
     r_scale_factor = initial_scale_factor
     for discontinuity_idx in range(idx_min, idx_max, skip):
@@ -58,16 +56,16 @@ def scan_discontinuities(data: dict,
         right_data = df_data.iloc[discontinuity_idx:discontinuity_idx_next].copy()
         l_scale_factor, l_cost = optimise_scale_factor(left_data, l_scale_factor)
         r_scale_factor, r_cost = optimise_scale_factor(right_data, r_scale_factor)
-        results = results.append({'discontinuity_idx_prev': discontinuity_idx_prev,
-                                  'discontinuity_idx_next': discontinuity_idx_next,
-                                  'discontinuity_idx': discontinuity_idx,
-                                  'x_timestamp': df_data['x_data'].iloc[discontinuity_idx],
-                                  'l_scale_factor': l_scale_factor,
-                                  'r_scale_factor': r_scale_factor,
-                                  'l_cost': l_cost,
-                                  'r_cost': r_cost,
-                                  'net_cost': l_cost + r_cost},
-                                 ignore_index=True)
+        results_list.append({'discontinuity_idx_prev': discontinuity_idx_prev,
+                             'discontinuity_idx_next': discontinuity_idx_next,
+                             'discontinuity_idx': discontinuity_idx,
+                             'x_timestamp': df_data['x_data'].iloc[discontinuity_idx],
+                             'l_scale_factor': l_scale_factor,
+                             'r_scale_factor': r_scale_factor,
+                             'l_cost': l_cost,
+                             'r_cost': r_cost,
+                             'net_cost': l_cost + r_cost})
+    results = pd.DataFrame.from_records(results_list)
     # Normalise cost values for plotting
     results['norm_net_cost'] = results['net_cost'] / results['net_cost'].max() * 100.
     return results
