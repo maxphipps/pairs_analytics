@@ -4,11 +4,10 @@ from bokeh.models import Button, ColumnDataSource, Slider, Band, Span, HoverTool
 from bokeh.models.layouts import Column
 from bokeh.models.ranges import DataRange1d
 from bokeh.palettes import Spectral6
-from bokeh.events import DoubleTap
 import numpy as np
 import pandas as pd
 
-from app.utils.model_utils import calculate_dynamic_data, scan_discontinuities, optimise_scale_factor
+from app.utils.model_utils import calculate_dynamic_data, scan_discontinuities
 
 """
 Main plot routines
@@ -38,12 +37,13 @@ class Dashboard:
         self._construct_slider()
         self._construct_discontinuity_button()
         self._construct_price_plot()
+        self._construct_scale_factor_plot()
         self._init_aux_handles()
         # residue plot x range linked with prices plot
         self._construct_residue_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
         self.p_layout = gridplot([[row(self.slider_pair_fac, self.discontinuity_button)],
-                                  [column(self.price_plot, self.residue_plot)]])
+                                  [column(self.price_plot, self.residue_plot, self.scale_factor_plot)]])
 
     def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
         """
@@ -175,6 +175,23 @@ class Dashboard:
         self.price_plot.extra_y_ranges = {"OptimisationScore": Range1d(0, 100)}
         self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
                                               axis_label="Optimisation Score"), 'right')
+
+    def _construct_scale_factor_plot(self):
+        """
+        Constructs scale factor plot
+        :return:
+        """
+        self.scale_factor_plot = figure(x_axis_type="datetime", title="Portfolio Weights", **self.plot_options)
+        line = self.scale_factor_plot.line("x_data", "scale_factor", source=self.data_container, color=self.COLORS[0])
+
+        self.scale_factor_plot.grid.grid_line_alpha = 0.3
+        self.scale_factor_plot.xaxis.axis_label = 'Date'
+        self.scale_factor_plot.yaxis.axis_label = 'Weight'
+        tooltips = [(self.ticker_labels[0], '1.00'),
+                    (self.ticker_labels[1], '@scale_factor{(0.00)}')]
+        self.scale_factor_plot.add_tools(HoverTool(tooltips=tooltips,
+                                                   formatters={'@scale_factor': 'numeral'},
+                                                   renderers=[line], mode="vline"))
 
     def _construct_residue_plot(self, x_axis_link: DataRange1d):
         """

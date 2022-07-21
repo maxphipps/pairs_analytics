@@ -54,8 +54,8 @@ def scan_discontinuities(data: dict,
 
         left_data = df_data.iloc[discontinuity_idx_prev:discontinuity_idx].copy()
         right_data = df_data.iloc[discontinuity_idx:discontinuity_idx_next].copy()
-        l_scale_factor, l_cost = optimise_scale_factor(left_data, l_scale_factor)
-        r_scale_factor, r_cost = optimise_scale_factor(right_data, r_scale_factor)
+        l_scale_factor, l_cost = optimise_scale_factor(left_data, initial_scale_factor=l_scale_factor)
+        r_scale_factor, r_cost = optimise_scale_factor(right_data, initial_scale_factor=r_scale_factor)
         results_list.append({'discontinuity_idx_prev': discontinuity_idx_prev,
                              'discontinuity_idx_next': discontinuity_idx_next,
                              'discontinuity_idx': discontinuity_idx,
@@ -69,6 +69,7 @@ def scan_discontinuities(data: dict,
     # Normalise cost values for plotting
     results['norm_net_cost'] = results['net_cost'] / results['net_cost'].max() * 100.
     return results
+
 
 def optimise_scale_factor(data: dict,
                           initial_scale_factor: float) -> float:
