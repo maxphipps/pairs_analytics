@@ -4,11 +4,10 @@ from bokeh.models import Button, ColumnDataSource, Slider, Band, Span, HoverTool
 from bokeh.models.layouts import Column
 from bokeh.models.ranges import DataRange1d
 from bokeh.palettes import Spectral6
-from bokeh.events import DoubleTap
 import numpy as np
 import pandas as pd
 
-from app.utils.model_utils import calculate_dynamic_data, scan_discontinuities, optimise_scale_factor
+from app.utils.model_utils import calculate_dynamic_data, scan_discontinuities
 
 """
 Main plot routines
@@ -31,19 +30,20 @@ class Dashboard:
         self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
         self.ticker_labels = ticker_labels
         self.data_len = len(df_prices)
-        self.discontinuity_idx_ser = pd.Series(dtype=int)
+        self.discontinuity_idx_list = list()
         # Construct data container
         self._generate_data_container(df_prices)
         # Gather plot components
         self._construct_slider()
         self._construct_discontinuity_button()
         self._construct_price_plot()
+        self._construct_scale_factor_plot()
         self._init_aux_handles()
         # residue plot x range linked with prices plot
         self._construct_residue_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
         self.p_layout = gridplot([[row(self.slider_pair_fac, self.discontinuity_button)],
-                                  [column(self.price_plot, self.residue_plot)]])
+                                  [column(self.price_plot, self.residue_plot, self.scale_factor_plot)]])
 
     def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
         """
@@ -97,7 +97,8 @@ class Dashboard:
             self.data_container.data['y_residue_ma'] = [None] * self.data_len
 
             # Scan space of possible discontinuities
-            res = scan_discontinuities(self.data_container.data, self.slider_pair_fac.value, self.discontinuity_idx_ser)
+            res = scan_discontinuities(self.data_container.data, self.slider_pair_fac.value,
+                                       pd.Series(self.discontinuity_idx_list, dtype=int))
 
             # Hide old optimisation line
             if self.optimisation_line:
@@ -111,7 +112,7 @@ class Dashboard:
 
             # Extract optimised values
             # Exclude previously identified discontinuities
-            is_new_discontinuity = ~res['discontinuity_idx'].isin(self.discontinuity_idx_ser)
+            is_new_discontinuity = ~res['discontinuity_idx'].isin(self.discontinuity_idx_list)
             _idxmin = res['norm_net_cost'][is_new_discontinuity].astype(float).idxmin()
             opt_vals = res.loc[_idxmin]  # idxmin uses loc
             opt_x = opt_vals['x_timestamp']
@@ -128,7 +129,7 @@ class Dashboard:
             discontinuity_idx_next = opt_vals['discontinuity_idx_next']
 
             # Add newly identified discontinuity to master list
-            self.discontinuity_idx_ser = self.discontinuity_idx_ser.append(pd.Series([discontinuity_idx]))
+            self.discontinuity_idx_list.append(discontinuity_idx)
 
             df_data.loc[discontinuity_idx_prev:discontinuity_idx, 'scale_factor'] = opt_vals['l_scale_factor']
             df_data.loc[discontinuity_idx:discontinuity_idx_next, 'scale_factor'] = opt_vals['r_scale_factor']
@@ -175,14 +176,24 @@ class Dashboard:
         self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
                                               axis_label="Optimisation Score"), 'right')
 
-        def callback(event):
-            vline = Span(location=event.x, dimension='height', line_color='red', line_width=1)
-            self.price_plot.renderers.extend([vline])
+    def _construct_scale_factor_plot(self):
+        """
+        Constructs scale factor plot
+        :return:
+        """
+        self.scale_factor_plot = figure(x_axis_type="datetime", title="Portfolio Weights", **self.plot_options)
+        line = self.scale_factor_plot.line("x_data", "scale_factor", source=self.data_container, color=self.COLORS[0])
 
-        self.price_plot.on_event(DoubleTap, callback)
+        self.scale_factor_plot.grid.grid_line_alpha = 0.3
+        self.scale_factor_plot.xaxis.axis_label = 'Date'
+        self.scale_factor_plot.yaxis.axis_label = 'Weight'
+        tooltips = [(self.ticker_labels[0], '1.00'),
+                    (self.ticker_labels[1], '@scale_factor{(0.00)}')]
+        self.scale_factor_plot.add_tools(HoverTool(tooltips=tooltips,
+                                                   formatters={'@scale_factor': 'numeral'},
+                                                   renderers=[line], mode="vline"))
 
-    def _construct_residue_plot(self,
-                                x_axis_link: DataRange1d):
+    def _construct_residue_plot(self, x_axis_link: DataRange1d):
         """
         Constructs residue plot (target of slider)
         :param x_axis_link: x axis object to couple this plot with
