@@ -175,14 +175,7 @@ class Dashboard:
         self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
                                               axis_label="Optimisation Score"), 'right')
 
-        def callback(event):
-            vline = Span(location=event.x, dimension='height', line_color='red', line_width=1)
-            self.price_plot.renderers.extend([vline])
-
-        self.price_plot.on_event(DoubleTap, callback)
-
-    def _construct_residue_plot(self,
-                                x_axis_link: DataRange1d):
+    def _construct_residue_plot(self, x_axis_link: DataRange1d):
         """
         Constructs residue plot (target of slider)
         :param x_axis_link: x axis object to couple this plot with
