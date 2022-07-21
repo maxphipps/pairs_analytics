@@ -51,15 +51,17 @@ class Dashboard:
         :param df_prices:
         :return:
         """
-        df = pd.DataFrame(index=df_prices.index)
+        df = pd.DataFrame()
         df['y0'] = df_prices.loc[:, self.ticker_labels[0]]
         df['y1_unscaled'] = df_prices.loc[:, self.ticker_labels[1]]
         df['x_data'] = datetime(df_prices['Date'])
         df['x_zeros'] = 0.
-        self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
-        df['scale_factor'] = self.initial_slider_value
+        df['x_index'] = df.index.copy(deep=True)
         self.data_container = ColumnDataSource(data=df)
-        calculate_dynamic_data(self.data_container.data, self.PRICE_DELTA_MA_WINDOW_DAYS)
+        self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
+        self.mdl_params = {'logistic_params': dict(l=self.initial_slider_value, m=self.initial_slider_value, k=1.0, x0=0.),
+                           'ma_window_days': self.PRICE_DELTA_MA_WINDOW_DAYS}
+        calculate_dynamic_data(self.data_container.data, self.mdl_params, calc_logistic_scale_factor=True)
 
     def _init_aux_handles(self):
         """
@@ -82,8 +84,7 @@ class Dashboard:
 
         def pair_factor_callback(attr, old, new):
             self.data_container.data['scale_factor'] = np.array([new] * self.data_len)
-            calculate_dynamic_data(data=self.data_container.data,
-                                   ma_window_days=self.PRICE_DELTA_MA_WINDOW_DAYS)
+            calculate_dynamic_data(self.data_container.data, self.mdl_params, calc_logistic_scale_factor=False)
 
         self.slider_pair_fac.on_change('value', pair_factor_callback)
 
@@ -137,8 +138,7 @@ class Dashboard:
             self.data_container.data = ColumnDataSource.from_df(df_data)
 
             # Unhide moving average by overriding Nones
-            calculate_dynamic_data(data=self.data_container.data,
-                                   ma_window_days=self.PRICE_DELTA_MA_WINDOW_DAYS)
+            calculate_dynamic_data(self.data_container.data, self.mdl_params, calc_logistic_scale_factor=True)
 
         self.discontinuity_button = Button(label="Find Discontinuity")
         self.discontinuity_button.on_click(discontinuity_button_callback)

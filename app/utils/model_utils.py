@@ -4,16 +4,19 @@ import numpy as np
 from app.utils.math_utils import rolling_mean
 import math
 
+from app.utils.math_utils import generalised_logistic
 
-def calculate_dynamic_data(data: dict,
-                           ma_window_days: int) -> None:
+
+def calculate_dynamic_data(data: dict, mdl_params: dict, calc_logistic_scale_factor=True) -> None:
     """
     Calculates quantities for the dynamic pairs model
     :return:
     """
+    if calc_logistic_scale_factor:
+        data['scale_factor'] = generalised_logistic(**mdl_params['logistic_params']).calculate(data['x_index'])
     data['y1_times_f'] = np.multiply(data['y1_unscaled'], data['scale_factor'])
     data['y_residue'] = data['y1_times_f'] - data['y0']
-    data['y_residue_ma'] = rolling_mean(data['y_residue'], ma_window_days)
+    data['y_residue_ma'] = rolling_mean(data['y_residue'], mdl_params['ma_window_days'])
 
 
 def scan_discontinuities(data: dict,

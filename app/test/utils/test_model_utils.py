@@ -9,9 +9,13 @@ class test_calculate_dynamic_data(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.data = dict()
+        cls.data['x_index'] = np.array([0, 1, 2])
         cls.data['y0'] = np.array([2., 5., 3.,])
-        cls.data['scale_factor'] = np.array([3., 3., 3.,])
         cls.data['y1_unscaled'] = np.array([3., 6., 4.])
+
+        # Line y=3.0
+        cls.mdl_params = {'logistic_params': dict(l=3.0, m=3.0, k=1.0, x0=0.),
+                          'ma_window_days': 1}
 
     def test_scale_factor(self):
         """
@@ -19,7 +23,8 @@ class test_calculate_dynamic_data(TestCase):
         :return:
         """
         _data = copy.copy(self.data)
-        calculate_dynamic_data(_data, ma_window_days=1)
+        _mdl_params = copy.copy(self.mdl_params)
+        calculate_dynamic_data(_data, _mdl_params)
         self.assertListEqual(list(_data['y1_times_f']), [9., 18., 12.])
 
     def test_price_residue(self):
@@ -28,5 +33,6 @@ class test_calculate_dynamic_data(TestCase):
         :return:
         """
         _data = copy.copy(self.data)
-        calculate_dynamic_data(_data, ma_window_days=1)
+        _mdl_params = copy.copy(self.mdl_params)
+        calculate_dynamic_data(_data, _mdl_params)
         self.assertListEqual(list(_data['y_residue']), [9.-2., 18.-5., 12.-3.])

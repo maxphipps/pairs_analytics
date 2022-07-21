@@ -16,7 +16,7 @@ class generalised_logistic:
     :param l: left (lower) asymptote
     :param m: right (upper asymptote
     :param k: sigmoid steepness
-    :param x0: sigmoid midpoint x shift
+    :param x0: sigmoid midpoint x-shift
     :return:
     """
     l: float
