@@ -21,25 +21,42 @@ This can be modified by updating the `tickers` variable in the `bkapp(...)` func
 Pairs trading seeks to find a (dollar neutral) portfolio of securities whose overall time series is stationary.
 Mean reversion of the series is then exploited to capture alpha.
 
+A portfolio is constructed from a pair of securities is constructed as
+
+![pair portfolio equation](https://latex.codecogs.com/svg.latex?p_\mathrm{pair}(t)=p_\mathrm{A}(t)+k(t)\cdot{}p_\mathrm{B}(t))
+
+where p is price,
+A and B are the labels of the specific securities comprising the portfolio,
+and k is the hedge ratio.
+
 One key challenge of identifying pairs trading opportunities is the fact that company fundamentals are subject to 
-long and short term shifts.
-Short term shifts, 
-that is to say single economic events with lasting impact on the fundamentals of one of the pair's companies,
-may be reflected by discontinuities in the combined time series.
-The code seeks to identify high likelihood shifts in the time series, and adjust the combined times series
-for these in order to aid the identification of pair formation potential.
+change over time, for example a weakening of one company's strength relative to the other company.
+Changes in the company fundamentals are reflected by shifts in the portfolio weights that are used to construct
+the combined time series.
+The code seeks to identify high likelihood periods where the fundamentals have shifted,
+and adjust the portfolio weights in order to aid the identification of pair formation potential.
 
-The code achieves this by performing a brute force grid search through potential splitting time points.
-At each grid point:
-1. the time series is split;
-2. the pairs portfolio weights are reoptimised for each of the partitioned time series;
-3. the time point at which the optimal overall fit of the two resulting time series to the left and to the right of the split point is
-found.
+The code achieves this by modelling the hedge ratio as a time-dependent quantity.
+The ratio is modelled using a specific form of the generalised logistic function.
+A logistic function is used in order to model a smooth transition from one environment of economic fundamentals to another.
+The specific form of this function is given by
 
-This splitting procedure therefore introduces a degree of freedom into the time series construction
-which represents a possible change in the relative strengths of the company fundamentals.
+![generalised logistic equation](https://latex.codecogs.com/svg.latex?k(t)=l+\frac{m-l}{1+e^{-k(t-a)}}) 
 
-(Formal equations of the portfolio construction and search to be documented here).
+where t is the time,
+l is the left asymptote,
+m is right asymptote,
+k is the sigmoid steepness,
+and a is the sigmoid midpoint shift.
+
+In the model, the hedge ratio is varied to minimise the absolute error of prices.
+The corresponding least absolute deviations cost function, g(k), is
+
+![cost function](https://latex.codecogs.com/svg.latex?g(k)=\sum_{t=0}^{t_\mathrm{max}}|p_\mathrm{A}(t)-k(t)\cdot{}p_\mathrm{B}(t)|)
+
+where t is over discrete values of the time domain.
+Overall, this procedure therefore introduces a degree of freedom into the portfolio construction that
+represents a change in the relative strengths of the company fundamentals.
 
 ### Installation
 The code requires the packages detailed in `requirements.txt` to be installed,
@@ -63,25 +80,20 @@ calculated using a specific price factor value.
 * The weighted stock price series is given by the left hand <i>y</i>-axis in the upper plot.
 * The portfolio spread is shown in the lower plot.
 
-For an example pair portfolio consisting of Shell and BP:
-![Pair factor slider](docs/pairs_factor_slider.gif)
+[comment]: <> (For an example pair portfolio consisting of Shell and BP:)
+
+[comment]: <> (![Pair factor slider]&#40;docs/pairs_factor_slider.gif&#41;)
 
 The "Find Discontinuity" button can be used to isolate discontinuities. 
-On clicking this button, the splitting procedure is started.
-On finishing,
-* A black line is displayed in the upper plot that shows the result of the optimisation, with the
-optimisation penalty score shown on the right hand <i>y</i>-axis;
-* A red vertical line is displayed in the upper plot that shows the optimal split time point.
+On clicking this button, the optimisation is started.
 
-For an example pair portfolio consisting of Shell and BP:
-![RDSA and BP pair discontinuity search](docs/find_discontinuity_rdsb_bp.gif)
+[comment]: <> (For an example pair portfolio consisting of Shell and BP:)
 
-For an example pair portfolio consisting of National Grid and SSE:
-![NG and SSE pair discontinuity search](docs/find_discontinuity_ng_sse.gif)
+[comment]: <> (![RDSA and BP pair discontinuity search]&#40;docs/find_discontinuity_rdsb_bp.gif&#41;)
+
+[comment]: <> (For an example pair portfolio consisting of National Grid and SSE:)
+
+[comment]: <> (![NG and SSE pair discontinuity search]&#40;docs/find_discontinuity_ng_sse.gif&#41;)
 
 ### Code Limitations
-* The brute force search grid is granular, and the optimisation would benefit from a local search to 
-  refine the final split time point;
-* The search will only identify (short term) discontinuities and not long term shifts.
-  For example, the code is not able to isolate relative weakening of one component company 
-  over a multi-month period that eventually ceases.
+* The model only allows for a single discontinuation.

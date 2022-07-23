@@ -7,7 +7,8 @@ from bokeh.palettes import Spectral6
 import numpy as np
 import pandas as pd
 
-from app.utils.model_utils import calculate_dynamic_data, scan_discontinuities
+from app.utils.constants import PRICE_DELTA_MA_WINDOW_DAYS
+from app.utils.model_utils import calculate_dynamic_data, optimise_scale_factor
 
 """
 Main plot routines
@@ -19,7 +20,6 @@ def datetime(x):
 
 
 class Dashboard:
-    PRICE_DELTA_MA_WINDOW_DAYS = 30 * 6
     COLORS = Spectral6
 
     def __init__(self, df_prices: pd.DataFrame, ticker_labels: tuple):
@@ -37,7 +37,6 @@ class Dashboard:
         self._construct_slider()
         self._construct_discontinuity_button()
         self._construct_price_plot()
-        self._init_aux_handles()
         # residue plot x range linked with prices plot
         self._construct_scale_factor_plot(x_axis_link=self.price_plot.x_range)
         self._construct_residue_plot(x_axis_link=self.price_plot.x_range)
@@ -51,22 +50,16 @@ class Dashboard:
         :param df_prices:
         :return:
         """
-        df = pd.DataFrame(index=df_prices.index)
+        df = pd.DataFrame()
         df['y0'] = df_prices.loc[:, self.ticker_labels[0]]
         df['y1_unscaled'] = df_prices.loc[:, self.ticker_labels[1]]
         df['x_data'] = datetime(df_prices['Date'])
         df['x_zeros'] = 0.
-        self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
-        df['scale_factor'] = self.initial_slider_value
+        df['x_index'] = df.index.copy(deep=True)
         self.data_container = ColumnDataSource(data=df)
-        calculate_dynamic_data(self.data_container.data, self.PRICE_DELTA_MA_WINDOW_DAYS)
-
-    def _init_aux_handles(self):
-        """
-        Initialises handles to objects
-        :return:
-        """
-        self.optimisation_line = None
+        self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
+        self.mdl_params = dict(l=self.initial_slider_value, m=self.initial_slider_value, k=0.01, x0=int(len(df)/2))
+        calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
     def _construct_slider(self) -> None:
         """
@@ -81,9 +74,9 @@ class Dashboard:
         self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
         def pair_factor_callback(attr, old, new):
-            self.data_container.data['scale_factor'] = np.array([new] * self.data_len)
-            calculate_dynamic_data(data=self.data_container.data,
-                                   ma_window_days=self.PRICE_DELTA_MA_WINDOW_DAYS)
+            self.mdl_params['l'] = new
+            self.mdl_params['m'] = new
+            calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
         self.slider_pair_fac.on_change('value', pair_factor_callback)
 
@@ -96,49 +89,16 @@ class Dashboard:
             # Hide moving average during optimisation by overriding with Nones
             self.data_container.data['y_residue_ma'] = [None] * self.data_len
 
-            # Scan space of possible discontinuities
-            res = scan_discontinuities(self.data_container.data, self.slider_pair_fac.value,
-                                       pd.Series(self.discontinuity_idx_list, dtype=int))
+            # Optimise
+            self.mdl_params = optimise_scale_factor(self.data_container.data, self.mdl_params)
 
-            # Hide old optimisation line
-            if self.optimisation_line:
-                self.optimisation_line.visible = False
-
-            # Plot results summary on secondary axis
-            line_kwargs = {'y_range_name': 'OptimisationScore', 'muted_alpha': 0.2,
-                           'source': ColumnDataSource.from_df(res), 'color': 'gray'}
-                           # 'legend_label': 'Discontinuity Optimisation Cost'
-            self.optimisation_line = self.price_plot.line("x_timestamp", "norm_net_cost", **line_kwargs)
-
-            # Extract optimised values
-            # Exclude previously identified discontinuities
-            is_new_discontinuity = ~res['discontinuity_idx'].isin(self.discontinuity_idx_list)
-            _idxmin = res['norm_net_cost'][is_new_discontinuity].astype(float).idxmin()
-            opt_vals = res.loc[_idxmin]  # idxmin uses loc
-            opt_x = opt_vals['x_timestamp']
-
-            # Display optimised discontinuity location
-            vline = Span(location=opt_x, dimension='height', line_color='red', line_width=1)
-            self.price_plot.renderers.extend([vline])
-
-            # Transform data
-            df_data = pd.DataFrame(self.data_container.data)
-            df_data = df_data.drop(columns='index')
-            discontinuity_idx = opt_vals['discontinuity_idx']
-            discontinuity_idx_prev = opt_vals['discontinuity_idx_prev']
-            discontinuity_idx_next = opt_vals['discontinuity_idx_next']
-
-            # Add newly identified discontinuity to master list
-            self.discontinuity_idx_list.append(discontinuity_idx)
-
-            df_data.loc[discontinuity_idx_prev:discontinuity_idx, 'scale_factor'] = opt_vals['l_scale_factor']
-            df_data.loc[discontinuity_idx:discontinuity_idx_next, 'scale_factor'] = opt_vals['r_scale_factor']
-
-            self.data_container.data = ColumnDataSource.from_df(df_data)
+            # # TODO: Display optimised discontinuity location
+            # # TODO: Interval instead of single line
+            # vline = Span(location=self.mdl_params['x0'], dimension='height', line_color='red', line_width=1)
+            # self.price_plot.renderers.extend([vline])
 
             # Unhide moving average by overriding Nones
-            calculate_dynamic_data(data=self.data_container.data,
-                                   ma_window_days=self.PRICE_DELTA_MA_WINDOW_DAYS)
+            calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
         self.discontinuity_button = Button(label="Find Discontinuity")
         self.discontinuity_button.on_click(discontinuity_button_callback)
@@ -204,7 +164,7 @@ class Dashboard:
 
         # moving average of residue series
         self.residue_plot.line("x_data", "y_residue_ma", source=self.data_container, color='gray', muted_alpha=0.2,
-                               alpha=0.5, line_width=1.5, legend_label=f'{self.PRICE_DELTA_MA_WINDOW_DAYS}D MA')
+                               alpha=0.5, line_width=1.5, legend_label=f'{PRICE_DELTA_MA_WINDOW_DAYS}D MA')
 
         # residue series
         self.residue_plot.line("x_data", "y_residue", source=self.data_container, color=self.COLORS[0],
