@@ -14,8 +14,7 @@ class test_calculate_dynamic_data(TestCase):
         cls.data['y1_unscaled'] = np.array([3., 6., 4.])
 
         # Line y=3.0
-        cls.mdl_params = {'logistic_params': dict(l=3.0, m=3.0, k=1.0, x0=0.),
-                          'ma_window_days': 1}
+        cls.mdl_params = dict(l=3.0, m=3.0, k=1.0, x0=0.)
 
     def test_hedge_ratio(self):
         """
@@ -27,12 +26,12 @@ class test_calculate_dynamic_data(TestCase):
         calculate_dynamic_data(_data, _mdl_params)
         self.assertListEqual(list(_data['y1_times_f']), [9., 18., 12.])
 
-    def test_price_residue(self):
+    def test_price_spread(self):
         """
-        Test price residue
+        Test price spread
         :return:
         """
         _data = copy.copy(self.data)
         _mdl_params = copy.copy(self.mdl_params)
         calculate_dynamic_data(_data, _mdl_params)
-        self.assertListEqual(list(_data['y_residue']), [9.-2., 18.-5., 12.-3.])
+        self.assertListEqual(list(_data['y_spread']), [9.-2., 18.-5., 12.-3.])
