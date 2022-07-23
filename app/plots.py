@@ -74,6 +74,8 @@ class Dashboard:
         self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
         def pair_factor_callback(attr, old, new):
+            self.mdl_params['l'] = new
+            self.mdl_params['m'] = new
             calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
         self.slider_pair_fac.on_change('value', pair_factor_callback)
