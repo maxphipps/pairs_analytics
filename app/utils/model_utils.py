@@ -13,8 +13,8 @@ def calculate_dynamic_data(data: dict, mdl_params: dict) -> None:
     """
     data['hedge_ratio'] = generalised_logistic(**mdl_params).calculate(data['x_index'])
     data['y1_times_f'] = np.multiply(data['y1_unscaled'], data['hedge_ratio'])
-    data['y_residue'] = data['y1_times_f'] - data['y0']
-    data['y_residue_ma'] = rolling_mean(data['y_residue'], PRICE_DELTA_MA_WINDOW_DAYS)
+    data['y_spread'] = data['y1_times_f'] - data['y0']
+    data['y_spread_ma'] = rolling_mean(data['y_spread'], PRICE_DELTA_MA_WINDOW_DAYS)
 
 
 def optimise_hedge_ratio(data: dict,
@@ -24,8 +24,8 @@ def optimise_hedge_ratio(data: dict,
         l, m, k, x0 = params
         data['hedge_ratio'] = generalised_logistic(l, m, k, x0).calculate(data['x_index'])
         data['y1_times_f'] = np.multiply(data['y1_unscaled'], data['hedge_ratio'])
-        data['y_residue'] = data['y1_times_f'] - data['y0']
-        cost = sum(abs(data['y_residue']))
+        data['y_spread'] = data['y1_times_f'] - data['y0']
+        cost = sum(abs(data['y_spread']))
         return cost
 
     x0 = [mdl_params[k] for k in ('l', 'm', 'k', 'x0')]

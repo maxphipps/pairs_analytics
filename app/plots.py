@@ -37,12 +37,12 @@ class Dashboard:
         self._construct_slider()
         self._construct_discontinuity_button()
         self._construct_price_plot()
-        # residue plot x range linked with prices plot
+        # spread plot x range linked with prices plot
         self._construct_hedge_ratio_plot(x_axis_link=self.price_plot.x_range)
-        self._construct_residue_plot(x_axis_link=self.price_plot.x_range)
+        self._construct_spread_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
         self.p_layout = gridplot([[row(self.slider_pair_fac, self.discontinuity_button)],
-                                  [column(self.price_plot, self.hedge_ratio_plot, self.residue_plot)]])
+                                  [column(self.price_plot, self.hedge_ratio_plot, self.spread_plot)]])
 
     def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
         """
@@ -86,7 +86,7 @@ class Dashboard:
         """
         def discontinuity_button_callback():
             # Hide moving average during optimisation by overriding with Nones
-            self.data_container.data['y_residue_ma'] = [None] * self.data_len
+            self.data_container.data['y_spread_ma'] = [None] * self.data_len
 
             # Optimise
             self.mdl_params = optimise_hedge_ratio(self.data_container.data, self.mdl_params)
@@ -148,34 +148,34 @@ class Dashboard:
                                                   formatters={'@hedge_ratio': 'numeral'},
                                                   renderers=[line], mode="vline"))
 
-    def _construct_residue_plot(self, x_axis_link: DataRange1d):
+    def _construct_spread_plot(self, x_axis_link: DataRange1d):
         """
-        Constructs residue plot (target of slider)
+        Constructs spread plot (target of slider)
         :param x_axis_link: x axis object to couple this plot with
         :return:
         """
-        self.residue_plot = figure(x_axis_type="datetime", title="Pair Price Delta", x_range=x_axis_link,
-                                   **self.plot_options)
+        self.spread_plot = figure(x_axis_type="datetime", title="Pair Price Delta", x_range=x_axis_link,
+                                  **self.plot_options)
 
         # horizontal line
         hline = Span(location=0, dimension='width', line_color='black', line_width=1)
-        self.residue_plot.renderers.extend([hline])
+        self.spread_plot.renderers.extend([hline])
 
-        # moving average of residue series
-        self.residue_plot.line("x_data", "y_residue_ma", source=self.data_container, color='gray', muted_alpha=0.2,
-                               alpha=0.5, line_width=1.5, legend_label=f'{PRICE_DELTA_MA_WINDOW_DAYS}D MA')
+        # moving average of spread series
+        self.spread_plot.line("x_data", "y_spread_ma", source=self.data_container, color='gray', muted_alpha=0.2,
+                              alpha=0.5, line_width=1.5, legend_label=f'{PRICE_DELTA_MA_WINDOW_DAYS}D MA')
 
-        # residue series
-        self.residue_plot.line("x_data", "y_residue", source=self.data_container, color=self.COLORS[0],
-                               legend_label='Price delta')
-        band = Band(base='x_data', lower='x_zeros', upper='y_residue', source=self.data_container, level='underlay',
+        # spread series
+        self.spread_plot.line("x_data", "y_spread", source=self.data_container, color=self.COLORS[0],
+                              legend_label='Price delta')
+        band = Band(base='x_data', lower='x_zeros', upper='y_spread', source=self.data_container, level='underlay',
                     fill_alpha=0.2, fill_color='#55FF88')
-        self.residue_plot.add_layout(band)
+        self.spread_plot.add_layout(band)
 
-        self.residue_plot.grid.grid_line_alpha = 0.3
-        self.residue_plot.xaxis.axis_label = 'Date'
-        self.residue_plot.yaxis.axis_label = r'$$\Delta \mathrm{Price}$$'
-        self.residue_plot.legend.location = 'bottom_left'
+        self.spread_plot.grid.grid_line_alpha = 0.3
+        self.spread_plot.xaxis.axis_label = 'Date'
+        self.spread_plot.yaxis.axis_label = r'$$\Delta \mathrm{Price}$$'
+        self.spread_plot.legend.location = 'bottom_left'
 
     def get_layout(self) -> Column:
         """
