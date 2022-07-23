@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from app.utils.constants import PRICE_DELTA_MA_WINDOW_DAYS
-from app.utils.model_utils import calculate_dynamic_data, optimise_scale_factor
+from app.utils.model_utils import calculate_dynamic_data, optimise_hedge_ratio
 
 """
 Main plot routines
@@ -38,11 +38,11 @@ class Dashboard:
         self._construct_discontinuity_button()
         self._construct_price_plot()
         # residue plot x range linked with prices plot
-        self._construct_scale_factor_plot(x_axis_link=self.price_plot.x_range)
+        self._construct_hedge_ratio_plot(x_axis_link=self.price_plot.x_range)
         self._construct_residue_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
         self.p_layout = gridplot([[row(self.slider_pair_fac, self.discontinuity_button)],
-                                  [column(self.price_plot, self.scale_factor_plot, self.residue_plot)]])
+                                  [column(self.price_plot, self.hedge_ratio_plot, self.residue_plot)]])
 
     def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
         """
@@ -66,7 +66,6 @@ class Dashboard:
         Constructs slider for pairs multiplier factor
         :return:
         """
-        # TODO: intelligent calculation of initial slider parameters
         slider_params = {'start': 0.5*self.initial_slider_value,
                          'end': 2.*self.initial_slider_value,
                          'value': self.initial_slider_value}
@@ -90,7 +89,7 @@ class Dashboard:
             self.data_container.data['y_residue_ma'] = [None] * self.data_len
 
             # Optimise
-            self.mdl_params = optimise_scale_factor(self.data_container.data, self.mdl_params)
+            self.mdl_params = optimise_hedge_ratio(self.data_container.data, self.mdl_params)
 
             # # TODO: Display optimised discontinuity location
             # # TODO: Interval instead of single line
@@ -130,24 +129,24 @@ class Dashboard:
         self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
                                               axis_label="Optimisation Score"), 'right')
 
-    def _construct_scale_factor_plot(self, x_axis_link: DataRange1d):
+    def _construct_hedge_ratio_plot(self, x_axis_link: DataRange1d):
         """
-        Constructs scale factor plot
+        Constructs hedge ratio plot
         :param x_axis_link: x axis object to couple this plot with
         :return:
         """
-        self.scale_factor_plot = figure(x_axis_type="datetime", title="Portfolio Weights", x_range=x_axis_link,
-                                        **self.plot_options)
-        line = self.scale_factor_plot.line("x_data", "scale_factor", source=self.data_container, color=self.COLORS[0])
+        self.hedge_ratio_plot = figure(x_axis_type="datetime", title="Hedge Ratio", x_range=x_axis_link,
+                                       **self.plot_options)
+        line = self.hedge_ratio_plot.line("x_data", "hedge_ratio", source=self.data_container, color=self.COLORS[0])
 
-        self.scale_factor_plot.grid.grid_line_alpha = 0.3
-        self.scale_factor_plot.xaxis.axis_label = 'Date'
-        self.scale_factor_plot.yaxis.axis_label = 'Weight'
+        self.hedge_ratio_plot.grid.grid_line_alpha = 0.3
+        self.hedge_ratio_plot.xaxis.axis_label = 'Date'
+        self.hedge_ratio_plot.yaxis.axis_label = 'Weight'
         tooltips = [(self.ticker_labels[0], '1.00'),
-                    (self.ticker_labels[1], '@scale_factor{(0.00)}')]
-        self.scale_factor_plot.add_tools(HoverTool(tooltips=tooltips,
-                                                   formatters={'@scale_factor': 'numeral'},
-                                                   renderers=[line], mode="vline"))
+                    (self.ticker_labels[1], '@hedge_ratio{(0.00)}')]
+        self.hedge_ratio_plot.add_tools(HoverTool(tooltips=tooltips,
+                                                  formatters={'@hedge_ratio': 'numeral'},
+                                                  renderers=[line], mode="vline"))
 
     def _construct_residue_plot(self, x_axis_link: DataRange1d):
         """

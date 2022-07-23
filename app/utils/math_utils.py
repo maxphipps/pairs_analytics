@@ -13,8 +13,8 @@ def rolling_mean(x, n):
 class generalised_logistic:
     """
     Modified logistic function
-    :param l: left (lower) asymptote
-    :param m: right (upper asymptote
+    :param l: left asymptote
+    :param m: right asymptote
     :param k: sigmoid steepness
     :param x0: sigmoid midpoint x-shift
     :return:

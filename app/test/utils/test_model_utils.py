@@ -17,7 +17,7 @@ class test_calculate_dynamic_data(TestCase):
         cls.mdl_params = {'logistic_params': dict(l=3.0, m=3.0, k=1.0, x0=0.),
                           'ma_window_days': 1}
 
-    def test_scale_factor(self):
+    def test_hedge_ratio(self):
         """
         Test price scaling
         :return:

@@ -11,19 +11,19 @@ def calculate_dynamic_data(data: dict, mdl_params: dict) -> None:
     Calculates quantities for the dynamic pairs model
     :return:
     """
-    data['scale_factor'] = generalised_logistic(**mdl_params).calculate(data['x_index'])
-    data['y1_times_f'] = np.multiply(data['y1_unscaled'], data['scale_factor'])
+    data['hedge_ratio'] = generalised_logistic(**mdl_params).calculate(data['x_index'])
+    data['y1_times_f'] = np.multiply(data['y1_unscaled'], data['hedge_ratio'])
     data['y_residue'] = data['y1_times_f'] - data['y0']
     data['y_residue_ma'] = rolling_mean(data['y_residue'], PRICE_DELTA_MA_WINDOW_DAYS)
 
 
-def optimise_scale_factor(data: dict,
-                          mdl_params: dict) -> float:
+def optimise_hedge_ratio(data: dict,
+                         mdl_params: dict) -> float:
     def cost_fcn(params):
         # TODO: refactor into calculate_dynamic_data(...)
         l, m, k, x0 = params
-        data['scale_factor'] = generalised_logistic(l, m, k, x0).calculate(data['x_index'])
-        data['y1_times_f'] = np.multiply(data['y1_unscaled'], data['scale_factor'])
+        data['hedge_ratio'] = generalised_logistic(l, m, k, x0).calculate(data['x_index'])
+        data['y1_times_f'] = np.multiply(data['y1_unscaled'], data['hedge_ratio'])
         data['y_residue'] = data['y1_times_f'] - data['y0']
         cost = sum(abs(data['y_residue']))
         return cost
