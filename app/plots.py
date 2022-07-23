@@ -89,7 +89,9 @@ class Dashboard:
             self.data_container.data['y_spread_ma'] = [None] * self.data_len
 
             # Optimise
+            self.discontinuity_button.label = "Optimising..."
             self.mdl_params = optimise_hedge_ratio(self.data_container.data, self.mdl_params)
+            self.discontinuity_button.label = "Find Discontinuity"
 
             # # TODO: Display optimised discontinuity location
             # # TODO: Interval instead of single line
