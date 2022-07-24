@@ -14,8 +14,8 @@ class test_calculate_dynamic_data(TestCase):
         cls.data['y1_unscaled'] = np.array([3., 6., 4.])
 
         # 2x lines: y=3.0 and y=2.0
-        cls.mdl_params = [dict(l=3.0, m=3.0, k=1.0, x0=0.),
-                          dict(l=2.0, m=2.0, k=1.0, x0=0.)]
+        cls.mdl_params = [dict(l=3.0, m=3.0, k=1.0, x0=0., active=1),
+                          dict(l=2.0, m=2.0, k=1.0, x0=0., active=1)]
 
     def test_hedge_ratio(self):
         """
