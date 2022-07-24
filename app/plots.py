@@ -58,7 +58,7 @@ class Dashboard:
         df['x_index'] = df.index.copy(deep=True)
         self.data_container = ColumnDataSource(data=df)
         self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
-        self.mdl_params = dict(l=self.initial_slider_value, m=self.initial_slider_value, k=0.01, x0=int(len(df)/2))
+        self.mdl_params = [dict(l=self.initial_slider_value, m=self.initial_slider_value, k=0.01, x0=int(len(df)/2))]
         calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
     def _construct_slider(self) -> None:
@@ -73,8 +73,8 @@ class Dashboard:
         self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
         def pair_factor_callback(attr, old, new):
-            self.mdl_params['l'] = new
-            self.mdl_params['m'] = new
+            self.mdl_params[0]['l'] = new
+            self.mdl_params[0]['m'] = new
             calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
         self.slider_pair_fac.on_change('value', pair_factor_callback)
@@ -90,7 +90,7 @@ class Dashboard:
 
             # Optimise
             self.discontinuity_button.label = "Optimising..."
-            self.mdl_params = optimise_hedge_ratio(self.data_container.data, self.mdl_params)
+            self.mdl_params = optimise_hedge_ratio(self.data_container.data, self.mdl_params, n_functions=1)
             self.discontinuity_button.label = "Find Discontinuity"
 
             # # TODO: Display optimised discontinuity location

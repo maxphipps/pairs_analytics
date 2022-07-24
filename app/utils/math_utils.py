@@ -38,4 +38,4 @@ class generalised_logistic:
         :param x: List of x value
         :return:
         """
-        return [self._func(x) for x in x_list]
+        return np.array([self._func(x) for x in x_list])
