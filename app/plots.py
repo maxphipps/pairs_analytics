@@ -1,11 +1,13 @@
 from bokeh.plotting import figure
 from bokeh.layouts import column, row, gridplot
+from bokeh.events import DoubleTap
 from bokeh.models import Button, ColumnDataSource, Slider, Band, Span, HoverTool, LinearAxis, Range1d
 from bokeh.models.layouts import Column
 from bokeh.models.ranges import DataRange1d
 from bokeh.palettes import Spectral6
 import numpy as np
 import pandas as pd
+import datetime
 
 from app.utils.constants import PRICE_DELTA_MA_WINDOW_DAYS
 from app.utils.model_utils import calculate_dynamic_data, optimise_hedge_ratio
@@ -15,7 +17,7 @@ Main plot routines
 """
 
 
-def datetime(x):
+def to_datetime_array(x):
     return np.array(x, dtype=np.datetime64)
 
 
@@ -30,7 +32,6 @@ class Dashboard:
         self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
         self.ticker_labels = ticker_labels
         self.data_len = len(df_prices)
-        self.discontinuity_idx_list = list()
         # Construct data container
         self._generate_data_container(df_prices)
         # Gather plot components
@@ -53,12 +54,13 @@ class Dashboard:
         df = pd.DataFrame()
         df['y0'] = df_prices.loc[:, self.ticker_labels[0]]
         df['y1_unscaled'] = df_prices.loc[:, self.ticker_labels[1]]
-        df['x_data'] = datetime(df_prices['Date'])
+        df['x_data'] = to_datetime_array(df_prices['Date'])
         df['x_zeros'] = 0.
         df['x_index'] = df.index.copy(deep=True)
+        self.data_length = int(len(df))
         self.data_container = ColumnDataSource(data=df)
         self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
-        self.mdl_params = [dict(l=self.initial_slider_value, m=self.initial_slider_value, k=0.01, x0=int(len(df)/2))]
+        self.mdl_params = [dict(l=self.initial_slider_value, m=self.initial_slider_value, k=0.01, x0=self.data_length/2)]
         calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
     def _construct_slider(self) -> None:
@@ -130,6 +132,19 @@ class Dashboard:
         self.price_plot.extra_y_ranges = {"OptimisationScore": Range1d(0, 100)}
         self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
                                               axis_label="Optimisation Score"), 'right')
+
+        def price_plot_callback(event):
+            vline = Span(location=event.x, dimension='height', line_color='red', line_width=1)
+            # Calculate x axis position in data units
+            datetime_clicked = datetime.datetime.fromtimestamp(event.x * 1E-3)
+            x_axis_minimum = datetime.datetime.fromtimestamp(float(self.data_container.data['x_data'][0]) * 1E-9)
+            x_axis_maximum = datetime.datetime.fromtimestamp(float(self.data_container.data['x_data'][-1]) * 1E-9)
+            ratio_of_x_axis = (datetime_clicked - x_axis_minimum) / (x_axis_maximum - x_axis_minimum)
+            x0 = self.data_length * ratio_of_x_axis
+            self.mdl_params['x0'] = x0
+            self.price_plot.renderers.extend([vline])
+
+        self.price_plot.on_event(DoubleTap, price_plot_callback)
 
     def _construct_hedge_ratio_plot(self, x_axis_link: DataRange1d):
         """
