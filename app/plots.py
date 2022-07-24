@@ -35,15 +35,17 @@ class Dashboard:
         # Construct data container
         self._generate_data_container(df_prices)
         # Gather plot components
-        self._construct_slider()
+        self._construct_hedge_ratio_slider()
         self._construct_discontinuity_button()
         self._construct_price_plot()
         # spread plot x range linked with prices plot
         self._construct_hedge_ratio_plot(x_axis_link=self.price_plot.x_range)
         self._construct_spread_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
-        self.p_layout = gridplot([[row(self.slider_pair_fac, self.discontinuity_button)],
-                                  [column(self.price_plot, self.hedge_ratio_plot, self.spread_plot)]])
+        self.p_layout = gridplot([[self.price_plot],
+                                  [self.hedge_ratio_plot, self.hedge_ratio_slider],
+                                  [self.spread_plot]],
+                                 width=400, height=250)
 
     def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
         """
@@ -63,23 +65,25 @@ class Dashboard:
         self.mdl_params = [dict(l=self.initial_slider_value, m=self.initial_slider_value, k=0.01, x0=self.data_length/2)]
         calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
-    def _construct_slider(self) -> None:
+    def _construct_hedge_ratio_slider(self) -> None:
         """
-        Constructs slider for pairs multiplier factor
+        Constructs slider for hedge ratio
         :return:
         """
         slider_params = {'start': 0.5*self.initial_slider_value,
                          'end': 2.*self.initial_slider_value,
-                         'value': self.initial_slider_value}
+                         'value': self.initial_slider_value,
+                         'orientation': 'vertical',
+                         'direction': 'rtl'}
         s_step = (slider_params['start'] - slider_params['end']) / 50
-        self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
+        self.hedge_ratio_slider = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
         def pair_factor_callback(attr, old, new):
             self.mdl_params[0]['l'] = new
             self.mdl_params[0]['m'] = new
             calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
-        self.slider_pair_fac.on_change('value', pair_factor_callback)
+        self.hedge_ratio_slider.on_change('value', pair_factor_callback)
 
     def _construct_discontinuity_button(self) -> None:
         """
