@@ -1,7 +1,7 @@
 from bokeh.plotting import figure
 from bokeh.layouts import column, row, gridplot
 from bokeh.events import DoubleTap
-from bokeh.models import Button, ColumnDataSource, Slider, Band, Span, HoverTool, LinearAxis, Range1d
+from bokeh.models import Button, ColumnDataSource, Slider, Band, Span, HoverTool
 from bokeh.models.layouts import Column
 from bokeh.models.ranges import DataRange1d
 from bokeh.palettes import Spectral6
@@ -127,11 +127,6 @@ class Dashboard:
         self.price_plot.add_tools(HoverTool(tooltips=[('x', '@x_data{%F}')],
                                             formatters={'@x_data': 'datetime'},
                                             renderers=[line0], mode="vline"))
-
-        # Add secondary axis
-        self.price_plot.extra_y_ranges = {"OptimisationScore": Range1d(0, 100)}
-        self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
-                                              axis_label="Optimisation Score"), 'right')
 
         def price_plot_callback(event):
             vline = Span(location=event.x, dimension='height', line_color='red', line_width=1)
