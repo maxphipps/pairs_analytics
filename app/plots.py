@@ -1,10 +1,10 @@
 from bokeh.plotting import figure
 from bokeh.layouts import column, row, gridplot
 from bokeh.events import DoubleTap
-from bokeh.models import Button, ColumnDataSource, Slider, Band, Span, HoverTool, LinearAxis, Range1d
+from bokeh.models import Button, ColumnDataSource, Slider, DateSlider, Band, Span, HoverTool, Panel, Tabs, CheckboxGroup
 from bokeh.models.layouts import Column
 from bokeh.models.ranges import DataRange1d
-from bokeh.palettes import Spectral6
+from bokeh.palettes import Spectral6, Spectral10
 import numpy as np
 import pandas as pd
 import datetime
@@ -20,9 +20,9 @@ Main plot routines
 def to_datetime_array(x):
     return np.array(x, dtype=np.datetime64)
 
-
 class Dashboard:
     COLORS = Spectral6
+    NUM_FUNCTIONS = 3
 
     def __init__(self, df_prices: pd.DataFrame, ticker_labels: tuple):
         """
@@ -31,21 +31,89 @@ class Dashboard:
         """
         self.plot_options = dict(width=500, plot_height=300, tools='pan,wheel_zoom')
         self.ticker_labels = ticker_labels
-        self.data_len = len(df_prices)
+        self.data_length = len(df_prices)
         # Construct data container
-        self._generate_data_container(df_prices)
+        self._init_data_container(df_prices)
+        self.x_axis_minimum = datetime.datetime.fromtimestamp(float(self.data_container.data['x_data'][0]) * 1E-9)
+        self.x_axis_maximum = datetime.datetime.fromtimestamp(float(self.data_container.data['x_data'][-1]) * 1E-9)
         # Gather plot components
-        self._construct_slider()
+        self._construct_hedge_ratio_slider()
         self._construct_discontinuity_button()
         self._construct_price_plot()
-        # spread plot x range linked with prices plot
         self._construct_hedge_ratio_plot(x_axis_link=self.price_plot.x_range)
+        self._construct_hedge_ratio_widgets()
+        self._initialise_hedging_function_data()
         self._construct_spread_plot(x_axis_link=self.price_plot.x_range)
         # Construct layout
-        self.p_layout = gridplot([[row(self.slider_pair_fac, self.discontinuity_button)],
-                                  [column(self.price_plot, self.hedge_ratio_plot, self.spread_plot)]])
+        self.p_layout = gridplot([[self.price_plot, column([self.discontinuity_button, self.hedge_ratio_widget_tabs])],
+                                  [self.hedge_ratio_plot, self.hedge_ratio_slider],
+                                  [self.spread_plot]],
+                                 width=400, height=250)
 
-    def _generate_data_container(self, df_prices: pd.DataFrame) -> None:
+    def plot_x_to_model_x(self, plot_x_value):
+        ratio_of_x_axis = (plot_x_value - self.x_axis_minimum) / (self.x_axis_maximum - self.x_axis_minimum)
+        x_clicked_in_data_units = self.data_length * ratio_of_x_axis
+        return x_clicked_in_data_units
+
+    def _construct_hedge_ratio_widgets(self):
+        def initial_midpoint_slider_callback(attr, old, new):
+            selected_function_idx = self.hedge_ratio_widget_tabs.active
+            if isinstance(new, np.datetime64):
+                # TODO: below conversion of numpy to datetime seems a little hacky
+                _datetime = datetime.datetime.fromtimestamp(new.astype(datetime.datetime) * 1E-9)
+                self.mdl_params[selected_function_idx]['x0'] = self.plot_x_to_model_x(_datetime)
+            else:
+                self.mdl_params[selected_function_idx]['x0'] = new
+
+        def function_is_active_checkbox_callback(event):
+            selected_function_idx = self.hedge_ratio_widget_tabs.active
+            # If active
+            if self.function_is_active_checkbox[selected_function_idx].active == [0]:
+                self.mdl_params[selected_function_idx]['active'] = 1
+            else:
+                self.mdl_params[selected_function_idx]['active'] = 0
+
+        # Tab elements
+        self.function_is_active_checkbox = []
+        self.function_initial_midpoint_slider = []
+        # Compile into tabs
+        tabs = []
+        for itab in range(self.NUM_FUNCTIONS):
+            self.function_is_active_checkbox.append(CheckboxGroup(labels=['Active'], active=[]))
+            self.function_is_active_checkbox[-1].on_click(function_is_active_checkbox_callback)
+
+            self.function_initial_midpoint_slider.append(DateSlider(start=self.x_axis_minimum.date(),
+                                                                    end=self.x_axis_maximum.date(),
+                                                                    value=self.x_axis_minimum.date(),
+                                                                    disabled=True,
+                                                                    step=1, title="Midpoint initial value"))
+            self.function_initial_midpoint_slider[-1].on_change('value', initial_midpoint_slider_callback)
+
+            tabs.append(Panel(child=gridplot([[self.function_is_active_checkbox[itab]],
+                                              [self.function_initial_midpoint_slider[itab]]]),
+                              title=str(itab+1)))
+        self.hedge_ratio_widget_tabs = Tabs(tabs=tabs)
+
+    def _initialise_hedging_function_data(self):
+        """
+        Initialise all hedging functions and update widgets accordingly.
+        Only first hedging function is active.
+        :return:
+        """
+        init_x0 = int(self.data_length/2)
+        self.mdl_params = [{'l': 0.0, 'm': 0.0, 'k': 0.01, 'x0': init_x0, 'active': 0}
+                           for ii in range(self.NUM_FUNCTIONS)]
+        self.mdl_params[0]['l'] = self.initial_slider_value
+        self.mdl_params[0]['m'] = self.initial_slider_value
+        self.mdl_params[0]['active'] = 1
+
+        # Update 1st function's tab data
+        self.function_is_active_checkbox[0].active = [0]
+        self.function_initial_midpoint_slider[0].value = self.data_container.data['x_data'][init_x0]
+
+        calculate_dynamic_data(self.data_container.data, self.mdl_params)
+
+    def _init_data_container(self, df_prices: pd.DataFrame) -> None:
         """
         Generates the data required for plotting
         :param df_prices:
@@ -57,29 +125,28 @@ class Dashboard:
         df['x_data'] = to_datetime_array(df_prices['Date'])
         df['x_zeros'] = 0.
         df['x_index'] = df.index.copy(deep=True)
-        self.data_length = int(len(df))
         self.data_container = ColumnDataSource(data=df)
-        self.initial_slider_value = df['y0'].mean() / df['y1_unscaled'].mean()
-        self.mdl_params = dict(l=self.initial_slider_value, m=self.initial_slider_value, k=0.01, x0=self.data_length/2)
-        calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
-    def _construct_slider(self) -> None:
+    def _construct_hedge_ratio_slider(self) -> None:
         """
-        Constructs slider for pairs multiplier factor
+        Constructs slider for hedge ratio
         :return:
         """
+        self.initial_slider_value = self.data_container.data['y0'].mean() / self.data_container.data['y1_unscaled'].mean()
         slider_params = {'start': 0.5*self.initial_slider_value,
                          'end': 2.*self.initial_slider_value,
-                         'value': self.initial_slider_value}
+                         'value': self.initial_slider_value,
+                         'orientation': 'vertical',
+                         'direction': 'rtl'}
         s_step = (slider_params['start'] - slider_params['end']) / 50
-        self.slider_pair_fac = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
+        self.hedge_ratio_slider = Slider(**slider_params, step=s_step, title="Pairs Price Factor")
 
         def pair_factor_callback(attr, old, new):
-            self.mdl_params['l'] = new
-            self.mdl_params['m'] = new
+            self.mdl_params[0]['l'] = new
+            self.mdl_params[0]['m'] = new
             calculate_dynamic_data(self.data_container.data, self.mdl_params)
 
-        self.slider_pair_fac.on_change('value', pair_factor_callback)
+        self.hedge_ratio_slider.on_change('value', pair_factor_callback)
 
     def _construct_discontinuity_button(self) -> None:
         """
@@ -88,11 +155,16 @@ class Dashboard:
         """
         def discontinuity_button_callback():
             # Hide moving average during optimisation by overriding with Nones
-            self.data_container.data['y_spread_ma'] = [None] * self.data_len
+            self.data_container.data['y_spread_ma'] = [None] * self.data_length
 
             # Optimise
             self.discontinuity_button.label = "Optimising..."
-            self.mdl_params = optimise_hedge_ratio(self.data_container.data, self.mdl_params)
+            opt_params = optimise_hedge_ratio(self.data_container.data, self.mdl_params, num_functions=self.NUM_FUNCTIONS)
+            # Update params
+            for ifunc in range(self.NUM_FUNCTIONS):
+                if self.mdl_params[ifunc].get('active'):
+                    for param in ('l', 'm', 'k', 'x0'):
+                        self.mdl_params[ifunc][param] = opt_params[ifunc][param]
             self.discontinuity_button.label = "Find Discontinuity"
 
             # # TODO: Display optimised discontinuity location
@@ -127,22 +199,28 @@ class Dashboard:
         self.price_plot.add_tools(HoverTool(tooltips=[('x', '@x_data{%F}')],
                                             formatters={'@x_data': 'datetime'},
                                             renderers=[line0], mode="vline"))
-
-        # Add secondary axis
-        self.price_plot.extra_y_ranges = {"OptimisationScore": Range1d(0, 100)}
-        self.price_plot.add_layout(LinearAxis(y_range_name="OptimisationScore",
-                                              axis_label="Optimisation Score"), 'right')
+        # 1 vline per logistic function, hidden
+        self.vlines = []
+        for ivline in range(self.NUM_FUNCTIONS):
+            self.vlines.append(Span(location=0, dimension='height', line_color=Spectral10[ivline],
+                                    line_width=1, visible=False))
+            self.price_plot.add_layout(self.vlines[-1])
 
         def price_plot_callback(event):
-            vline = Span(location=event.x, dimension='height', line_color='red', line_width=1)
-            # Calculate x axis position in data units
+            # Show line
+            selected_function_idx = self.hedge_ratio_widget_tabs.active
+            self.vlines[selected_function_idx].visible = True
+            self.vlines[selected_function_idx].location = event.x
+            self.function_is_active_checkbox[selected_function_idx].active = [0]
+
+            # Update slider with new initial midpoint value
+            selected_function_idx = self.hedge_ratio_widget_tabs.active
+            self.function_initial_midpoint_slider[selected_function_idx].value = event.x
+
+            # Set function x0 value
             datetime_clicked = datetime.datetime.fromtimestamp(event.x * 1E-3)
-            x_axis_minimum = datetime.datetime.fromtimestamp(float(self.data_container.data['x_data'][0]) * 1E-9)
-            x_axis_maximum = datetime.datetime.fromtimestamp(float(self.data_container.data['x_data'][-1]) * 1E-9)
-            ratio_of_x_axis = (datetime_clicked - x_axis_minimum) / (x_axis_maximum - x_axis_minimum)
-            x0 = self.data_length * ratio_of_x_axis
-            self.mdl_params['x0'] = x0
-            self.price_plot.renderers.extend([vline])
+            x_clicked_in_data_units = self.plot_x_to_model_x(datetime_clicked)
+            self.mdl_params[selected_function_idx]['x0'] = x_clicked_in_data_units
 
         self.price_plot.on_event(DoubleTap, price_plot_callback)
 
