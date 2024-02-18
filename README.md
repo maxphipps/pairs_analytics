@@ -86,7 +86,7 @@ On clicking this button, the optimisation is started. Additional
 
 For an example pair portfolio consisting of Shell and BP:
 
-![Pair factor slider](docs/find_discontinuity_rdsb_bp_updated.gif)
+![RDSA and BP pair discontinuity search](docs/find_discontinuity_rdsb_bp_updated.gif)
 
 
 #### Pre-July 2022
